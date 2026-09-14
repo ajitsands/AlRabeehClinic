@@ -223,7 +223,7 @@ export default function SettingsView() {
 
   return (
     <div className="w-full flex justify-center">
-      <form onSubmit={handleSaveAll} className="space-y-5 w-full max-w-5xl px-4 sm:px-6 lg:px-8 py-2">
+      <form onSubmit={handleSaveAll} className="space-y-5 w-full max-w-7xl px-3 sm:px-5 lg:px-6 py-2">
       
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
