@@ -20,7 +20,17 @@
 </IfModule>
 
 # Set default directory index to compiled frontend
-DirectoryIndex dental-app/dist/index.html index.php index.html
+DirectoryIndex index.html dental-app/dist/index.html index.php
 
 # Prevent 403 on directory listing
 Options -Indexes +FollowSymLinks
+
+# Disable caching for index files so updates reflect immediately
+<IfModule mod_headers.c>
+    <FilesMatch "\.(html|php)$">
+        Header set Cache-Control "no-cache, no-store, must-revalidate, max-age=0"
+        Header set Pragma "no-cache"
+        Header set Expires "0"
+    </FilesMatch>
+</IfModule>
+
