@@ -236,6 +236,16 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
     ? doctors
     : doctors.filter(d => d.id === selectedDoctorFilter);
 
+  // Status Counts for Selected Date & Doctor Filter
+  const activeAppointments = selectedDoctorFilter === 'ALL'
+    ? appointments
+    : appointments.filter(a => a.doctor_id === selectedDoctorFilter);
+
+  const confirmedCount = activeAppointments.filter(a => a.status === 'CONFIRMED' || a.status === 'SCHEDULED' || !a.status).length;
+  const checkedInCount = activeAppointments.filter(a => a.status === 'CHECKED_IN').length;
+  const inChairCount = activeAppointments.filter(a => a.status === 'IN_CHAIR' || a.status === 'IN_PROGRESS').length;
+  const completedCount = activeAppointments.filter(a => a.status === 'COMPLETED').length;
+
   // Status Color Tags
   const getStatusBadge = (status) => {
     switch (status) {
@@ -300,23 +310,38 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
           </span>
         </div>
 
-        {/* Legend & Stats */}
+        {/* Legend & Stats with Big Bold Count Numbers */}
         <div className="flex flex-wrap items-center gap-2 text-xs">
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-900 font-semibold">
-            <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-900 font-bold shadow-2xs">
+            <span className="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
             <span>Confirmed</span>
+            <span className="px-2 py-0.5 text-xs sm:text-sm font-black bg-blue-200/80 dark:bg-blue-900/80 text-blue-900 dark:text-white rounded-md border border-blue-300 dark:border-blue-700">
+              {confirmedCount}
+            </span>
           </div>
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-900 font-semibold">
-            <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-900 font-bold shadow-2xs">
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
             <span>Checked-In</span>
+            <span className="px-2 py-0.5 text-xs sm:text-sm font-black bg-amber-200/80 dark:bg-amber-900/80 text-amber-900 dark:text-white rounded-md border border-amber-300 dark:border-amber-700">
+              {checkedInCount}
+            </span>
           </div>
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-900 font-semibold">
-            <span className="w-2 h-2 rounded-full bg-purple-500 animate-ping"></span>
+
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-900 font-bold shadow-2xs">
+            <span className="w-2.5 h-2.5 rounded-full bg-purple-500 animate-pulse"></span>
             <span>In Dental Chair</span>
+            <span className="px-2 py-0.5 text-xs sm:text-sm font-black bg-purple-200/80 dark:bg-purple-900/80 text-purple-900 dark:text-white rounded-md border border-purple-300 dark:border-purple-700">
+              {inChairCount}
+            </span>
           </div>
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900 font-semibold">
-            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900 font-bold shadow-2xs">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
             <span>Completed</span>
+            <span className="px-2 py-0.5 text-xs sm:text-sm font-black bg-emerald-200/80 dark:bg-emerald-900/80 text-emerald-900 dark:text-white rounded-md border border-emerald-300 dark:border-emerald-700">
+              {completedCount}
+            </span>
           </div>
 
           {/* Doctor Filter */}
@@ -325,7 +350,7 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
             <select
               value={selectedDoctorFilter}
               onChange={(e) => setSelectedDoctorFilter(e.target.value)}
-              className="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-semibold py-1.5 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 focus:outline-none"
+              className="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-semibold py-1.5 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 focus:outline-none cursor-pointer"
             >
               <option value="ALL">All Doctors ({doctors.length})</option>
               {doctors.map(d => (
