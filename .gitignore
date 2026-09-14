@@ -2,11 +2,6 @@
 node_modules/
 **/node_modules/
 
-# Production build outputs
-dist/
-**/dist/
-dist-ssr/
-**/dist-ssr/
 
 # Logs
 *.log
@@ -33,5 +28,8 @@ DevelopSupportFilesFolder/
 
 # Static download executables cache
 dental-app/public/downloads/
+dental-app/dist/downloads/
+**/downloads/
+
 
 
