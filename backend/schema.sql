@@ -1,0 +1,172 @@
+-- Al Rabeesh Dental Clinic Management System
+-- MySQL Schema (UTF-8 MB4 Support)
+
+CREATE DATABASE IF NOT EXISTS `al_rabeesh_dental` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE `al_rabeesh_dental`;
+
+-- 1. System Settings Table
+CREATE TABLE IF NOT EXISTS `system_settings` (
+    `id` VARCHAR(50) PRIMARY KEY,
+    `clinic_name` VARCHAR(255) NOT NULL DEFAULT 'Al Rabeesh Dental Specialty Center',
+    `theme` VARCHAR(20) NOT NULL DEFAULT 'light',
+    `timezone` VARCHAR(50) NOT NULL DEFAULT 'Asia/Bahrain',
+    `date_format` VARCHAR(20) NOT NULL DEFAULT 'DD/MM/YYYY',
+    `currency_code` VARCHAR(10) NOT NULL DEFAULT 'BHD',
+    `currency_symbol` VARCHAR(10) NOT NULL DEFAULT 'BD',
+    `currency_decimals` INT NOT NULL DEFAULT 3,
+    `reader_ws_url` VARCHAR(255) NOT NULL DEFAULT 'ws://localhost:5060/SCardRead',
+    `reader_rest_url` VARCHAR(255) NOT NULL DEFAULT 'http://localhost:5050/api/operation/ReadCard',
+    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- 2. Users & Staff Roles Table
+CREATE TABLE IF NOT EXISTS `users` (
+    `id` VARCHAR(36) PRIMARY KEY,
+    `username` VARCHAR(50) UNIQUE NOT NULL,
+    `password_hash` VARCHAR(255) NOT NULL,
+    `full_name` VARCHAR(100) NOT NULL,
+    `role` ENUM('ADMIN', 'DOCTOR', 'RECEPTIONIST', 'NURSE') NOT NULL DEFAULT 'RECEPTIONIST',
+    `email` VARCHAR(100) NULL,
+    `phone` VARCHAR(20) NULL,
+    `is_active` TINYINT(1) NOT NULL DEFAULT 1,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- 3. Doctors Table
+CREATE TABLE IF NOT EXISTS `doctors` (
+    `id` VARCHAR(36) PRIMARY KEY,
+    `name` VARCHAR(100) NOT NULL,
+    `specialty` VARCHAR(100) NOT NULL DEFAULT 'General Dental Surgeon',
+    `qualification` VARCHAR(100) NOT NULL,
+    `room_number` VARCHAR(20) NOT NULL,
+    `chair_number` VARCHAR(20) NOT NULL,
+    `phone` VARCHAR(20) NULL,
+    `email` VARCHAR(100) NULL,
+    `photo_url` LONGTEXT NULL,
+    `color_tag` VARCHAR(20) NOT NULL DEFAULT '#3B82F6',
+    `start_time` VARCHAR(10) NOT NULL DEFAULT '09:00',
+    `end_time` VARCHAR(10) NOT NULL DEFAULT '17:00',
+    `slot_duration_mins` INT NOT NULL DEFAULT 30,
+    `is_active` TINYINT(1) NOT NULL DEFAULT 1,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- 4. Dental Services Catalog Table
+CREATE TABLE IF NOT EXISTS `dental_services` (
+    `id` VARCHAR(36) PRIMARY KEY,
+    `name` VARCHAR(100) NOT NULL,
+    `category` VARCHAR(50) NOT NULL DEFAULT 'General',
+    `default_duration_mins` INT NOT NULL DEFAULT 30,
+    `required_slots` INT NOT NULL DEFAULT 1,
+    `price` DECIMAL(10, 3) NOT NULL DEFAULT 0.000,
+    `description` TEXT NULL,
+    `is_active` TINYINT(1) NOT NULL DEFAULT 1,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- 5. Patients Table (Supports Smart Card Reader Data & Arabic/English names)
+CREATE TABLE IF NOT EXISTS `patients` (
+    `id` VARCHAR(36) PRIMARY KEY,
+    `file_number` VARCHAR(30) UNIQUE NOT NULL,
+    `cpr_number` VARCHAR(30) NULL,
+    `full_name_en` VARCHAR(150) NOT NULL,
+    `full_name_ar` VARCHAR(150) NULL,
+    `phone` VARCHAR(30) NOT NULL,
+    `email` VARCHAR(100) NULL,
+    `dob` DATE NULL,
+    `gender` ENUM('MALE', 'FEMALE', 'OTHER') NOT NULL DEFAULT 'MALE',
+    `nationality` VARCHAR(50) NULL,
+    `blood_group` VARCHAR(10) NULL,
+    `address` TEXT NULL,
+    `emergency_contact_name` VARCHAR(100) NULL,
+    `emergency_contact_phone` VARCHAR(30) NULL,
+    `photo_base64` LONGTEXT NULL,
+    `allergies` TEXT NULL,
+    `medical_alerts` TEXT NULL,
+    `source` VARCHAR(30) NOT NULL DEFAULT 'CARD_READER',
+    `sync_version` BIGINT NOT NULL DEFAULT 1,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX `idx_cpr` (`cpr_number`),
+    INDEX `idx_phone` (`phone`),
+    INDEX `idx_name` (`full_name_en`)
+) ENGINE=InnoDB;
+
+-- 6. Patient Vitals Table
+CREATE TABLE IF NOT EXISTS `patient_vitals` (
+    `id` VARCHAR(36) PRIMARY KEY,
+    `patient_id` VARCHAR(36) NOT NULL,
+    `recorded_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `bp_systolic` INT NULL,
+    `bp_diastolic` INT NULL,
+    `pulse_bpm` INT NULL,
+    `temperature_c` DECIMAL(4, 1) NULL,
+    `spo2_percent` INT NULL,
+    `blood_sugar_mg` INT NULL,
+    `weight_kg` DECIMAL(5, 1) NULL,
+    `pain_scale` INT NULL DEFAULT 0,
+    `clinical_notes` TEXT NULL,
+    `recorded_by_user_id` VARCHAR(36) NULL,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (`patient_id`) REFERENCES `patients`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- 7. Patient Clinical Attachments Table (Up to 100MB File Support)
+CREATE TABLE IF NOT EXISTS `patient_attachments` (
+    `id` VARCHAR(36) PRIMARY KEY,
+    `patient_id` VARCHAR(36) NOT NULL,
+    `appointment_id` VARCHAR(36) NULL,
+    `file_name` VARCHAR(255) NOT NULL,
+    `original_name` VARCHAR(255) NOT NULL,
+    `category` ENUM('XRAY_OPG', 'INTRAORAL_PHOTO', 'LAB_REPORT', 'PRESCRIPTION', 'ID_DOCUMENT', 'OTHER') NOT NULL DEFAULT 'XRAY_OPG',
+    `file_size_bytes` BIGINT NOT NULL,
+    `mime_type` VARCHAR(100) NOT NULL,
+    `file_path` VARCHAR(500) NOT NULL,
+    `file_data_base64` LONGTEXT NULL,
+    `notes` TEXT NULL,
+    `uploaded_by_user_id` VARCHAR(36) NULL,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (`patient_id`) REFERENCES `patients`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- 8. Appointments Table (Multi-Slot Booking Engine)
+CREATE TABLE IF NOT EXISTS `appointments` (
+    `id` VARCHAR(36) PRIMARY KEY,
+    `patient_id` VARCHAR(36) NOT NULL,
+    `doctor_id` VARCHAR(36) NOT NULL,
+    `service_id` VARCHAR(36) NULL,
+    `appointment_date` DATE NOT NULL,
+    `start_time` VARCHAR(10) NOT NULL,
+    `end_time` VARCHAR(10) NOT NULL,
+    `slot_count` INT NOT NULL DEFAULT 1,
+    `duration_mins` INT NOT NULL DEFAULT 30,
+    `status` ENUM('SCHEDULED', 'CONFIRMED', 'CHECKED_IN', 'IN_CHAIR', 'COMPLETED', 'CANCELLED', 'NO_SHOW') NOT NULL DEFAULT 'SCHEDULED',
+    `chief_complaint` TEXT NULL,
+    `notes` TEXT NULL,
+    `estimated_fee` DECIMAL(10, 3) NOT NULL DEFAULT 0.000,
+    `sync_version` BIGINT NOT NULL DEFAULT 1,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (`patient_id`) REFERENCES `patients`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`doctor_id`) REFERENCES `doctors`(`id`) ON DELETE CASCADE,
+    INDEX `idx_app_date_doc` (`appointment_date`, `doctor_id`)
+) ENGINE=InnoDB;
+
+-- 9. Offline Outbox Sync Log Table
+CREATE TABLE IF NOT EXISTS `sync_logs` (
+    `id` VARCHAR(36) PRIMARY KEY,
+    `client_device_id` VARCHAR(100) NOT NULL,
+    `entity_type` VARCHAR(50) NOT NULL,
+    `entity_id` VARCHAR(36) NOT NULL,
+    `action` ENUM('INSERT', 'UPDATE', 'DELETE') NOT NULL,
+    `payload` LONGTEXT NOT NULL,
+    `synced_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- Initial Settings Seed
+INSERT INTO `system_settings` (`id`, `clinic_name`, `theme`, `timezone`, `date_format`, `currency_code`, `currency_symbol`, `currency_decimals`)
+VALUES ('default_config', 'Al Rabeesh Dental Specialty Center', 'light', 'Asia/Bahrain', 'DD/MM/YYYY', 'BHD', 'BD', 3)
+ON DUPLICATE KEY UPDATE `id` = `id`;
