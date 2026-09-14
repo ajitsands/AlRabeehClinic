@@ -1,3 +1,7 @@
 e:\Al Rabeesh Software\ReaderSDK\eRevealerSetup\eRevealerSetup 5.4.0.4.exe
 e:\Al Rabeesh Software\ReaderSDK\SCardReadServer\SCardReadServer\SCardReadServer.exe
 
+git pull origin main
+cp -f dental-app/dist/index.html .
+rm -rf assets
+cp -r dental-app/dist/assets .
