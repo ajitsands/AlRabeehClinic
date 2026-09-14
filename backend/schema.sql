@@ -1,8 +1,8 @@
 -- Al Rabeesh Dental Clinic Management System
 -- MySQL Schema (UTF-8 MB4 Support)
 
-CREATE DATABASE IF NOT EXISTS `al_rabeesh_dental` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE `al_rabeesh_dental`;
+CREATE DATABASE IF NOT EXISTS `sandsl23_alrabeeh_db` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE `sandsl23_alrabeeh_db`;
 
 -- 1. System Settings Table
 CREATE TABLE IF NOT EXISTS `system_settings` (

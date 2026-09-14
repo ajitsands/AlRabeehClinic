@@ -4,7 +4,13 @@ class SyncEngine {
   constructor() {
     this.isOnline = navigator.onLine;
     this.isSyncing = false;
-    this.apiUrl = 'http://localhost/backend/api/sync.php';
+    
+    // Target live production server at alrabeesh.sandslab.com with localhost fallback
+    const isProduction = typeof window !== 'undefined' && window.location.hostname.includes('sandslab.com');
+    this.apiUrl = isProduction 
+      ? `${window.location.origin}/backend/api/sync.php`
+      : 'https://alrabeesh.sandslab.com/backend/api/sync.php';
+
     this.listeners = new Map();
     this.lastSyncTime = localStorage.getItem('last_sync_time') || null;
 

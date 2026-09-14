@@ -10,28 +10,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 class Database {
-    private $host = "localhost";
-    private $db_name = "al_rabeesh_dental";
-    private $username = "root";
-    private $password = "";
+    // Live Server Configuration for alrabeesh.sandslab.com
+    private $host = "localhost"; // Local socket on cPanel server, or "alrabeesh.sandslab.com" for remote connections
+    private $db_name = "sandsl23_alrabeeh_db";
+    private $username = "sandsl23_alrabeeh_user";
+    private $password = "S@nds1@b";
     public $conn;
 
     public function getConnection() {
         $this->conn = null;
+        
+        // Allow environment variable overrides if provided
+        $host = getenv('DB_HOST') ?: $this->host;
+        $db_name = getenv('DB_NAME') ?: $this->db_name;
+        $username = getenv('DB_USER') ?: $this->username;
+        $password = getenv('DB_PASS') ?: $this->password;
+
         try {
             $this->conn = new PDO(
-                "mysql:host=" . $this->host . ";dbname=" . $this->db_name . ";charset=utf8mb4",
-                $this->username,
-                $this->password,
+                "mysql:host=" . $host . ";dbname=" . $db_name . ";charset=utf8mb4",
+                $username,
+                $password,
                 [
                     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                    PDO::ATTR_EMULATE_PREPARES => false
+                    PDO::ATTR_EMULATE_PREPARES => false,
+                    PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci"
                 ]
             );
         } catch(PDOException $exception) {
-            // In offline or local mode, fallback gracefully
-            // error_log("Database connection error: " . $exception->getMessage());
+            // Log connection error for debugging
+            error_log("Database connection error on " . $host . " / " . $db_name . ": " . $exception->getMessage());
         }
         return $this->conn;
     }
