@@ -3,6 +3,7 @@ import { db } from '../../db/indexedDB';
 import { useApp, generateClinicTimeSlots, isSlotInBreak } from '../../context/AppContext';
 import { syncEngine } from '../../services/syncEngine';
 import confetti from 'canvas-confetti';
+import SearchablePatientSelect from '../common/SearchablePatientSelect';
 import { 
   Calendar as CalendarIcon, 
   ChevronLeft, 
@@ -572,30 +573,15 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
               
               {/* 1. Patient Selection with Fast Search */}
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1">
-                  1. Select Patient (Search by CPR, Mobile, or Name)
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1.5">
+                  1. Select Patient (Search by CPR, Mobile, File No, or Name)
                 </label>
-                <input
-                  type="text"
-                  placeholder="Type CPR number, Name, or Mobile..."
-                  value={patientSearchQuery}
-                  onChange={(e) => setPatientSearchQuery(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white mb-2"
+                <SearchablePatientSelect
+                  patients={patients}
+                  selectedPatientId={bookingPatientId}
+                  onSelectPatient={setBookingPatientId}
+                  placeholder="Search patient by Name, CPR, Mobile, File No..."
                 />
-                
-                <select
-                  value={bookingPatientId}
-                  onChange={(e) => setBookingPatientId(e.target.value)}
-                  required
-                  className="w-full px-3.5 py-2.5 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">-- Choose Patient ({filteredPatients.length} found) --</option>
-                  {filteredPatients.map(p => (
-                    <option key={p.id} value={p.id}>
-                      {p.full_name_en} ({p.full_name_ar || ''}) | CPR: {p.cpr_number || 'N/A'} | Mob: {p.phone}
-                    </option>
-                  ))}
-                </select>
               </div>
 
               {/* 2. Doctor & Chair */}

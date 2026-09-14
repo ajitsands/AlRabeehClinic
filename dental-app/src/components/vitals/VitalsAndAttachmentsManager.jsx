@@ -3,6 +3,7 @@ import { db } from '../../db/indexedDB';
 import { useApp } from '../../context/AppContext';
 import { syncEngine } from '../../services/syncEngine';
 import confetti from 'canvas-confetti';
+import SearchablePatientSelect from '../common/SearchablePatientSelect';
 import { 
   Activity, 
   FileText, 
@@ -213,21 +214,13 @@ export default function VitalsAndAttachmentsManager({ activePatientId, onBackToL
           </div>
 
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <select
-                value={selectedPatientId}
-                onChange={(e) => setSelectedPatientId(e.target.value)}
-                className="bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-extrabold text-sm sm:text-base py-1.5 px-3 rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-none"
-              >
-                {patients.map(p => (
-                  <option key={p.id} value={p.id}>
-                    {p.full_name_en} ({p.file_number}) - CPR: {p.cpr_number || 'N/A'}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <SearchablePatientSelect
+              patients={patients}
+              selectedPatientId={selectedPatientId}
+              onSelectPatient={setSelectedPatientId}
+            />
             {patient && (
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                 {patient.full_name_ar ? `${patient.full_name_ar} • ` : ''}Phone: {patient.phone} • Blood: {patient.blood_group || 'O+'}
               </p>
             )}
