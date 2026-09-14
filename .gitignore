@@ -27,3 +27,7 @@ Thumbs.db
 *.sln
 *.sw?
 *.local
+
+# Development support documentation folder
+DevelopSupportFilesFolder/
+
