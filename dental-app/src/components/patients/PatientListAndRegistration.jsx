@@ -295,7 +295,7 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-1">
-                    <span className="px-2 py-0.5 text-[10px] font-extrabold uppercase bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 rounded-md border border-blue-200 dark:border-blue-900">
+                    <span className="px-2.5 py-1 text-xs font-black tracking-wider uppercase bg-blue-100 dark:bg-blue-900/70 text-blue-800 dark:text-blue-200 rounded-lg border border-blue-300 dark:border-blue-700 shadow-xs">
                       {patient.file_number}
                     </span>
                     {patient.source === 'CARD_READER' && (
