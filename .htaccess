@@ -1,0 +1,26 @@
+# Al Rabeesh Dental Software - Apache Configuration
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+
+    # Allow direct access to existing backend API and SDK files
+    RewriteCond %{REQUEST_URI} ^/backend/ [NC,OR]
+    RewriteCond %{REQUEST_URI} ^/ReaderSDK/ [NC]
+    RewriteRule ^ - [L]
+
+    # Map static assets to dental-app/dist/
+    RewriteRule ^assets/(.*)$ dental-app/dist/assets/$1 [L]
+    RewriteRule ^favicon\.svg$ dental-app/dist/favicon.svg [L]
+    RewriteRule ^icons\.svg$ dental-app/dist/icons.svg [L]
+
+    # Serve compiled SPA frontend for all other requests
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ dental-app/dist/index.html [L]
+</IfModule>
+
+# Set default directory index to compiled frontend
+DirectoryIndex dental-app/dist/index.html index.php index.html
+
+# Prevent 403 on directory listing
+Options -Indexes +FollowSymLinks
