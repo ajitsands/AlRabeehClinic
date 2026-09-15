@@ -12,6 +12,16 @@ class SyncEngine {
     this.listeners = new Map();
     this.lastSyncTime = localStorage.getItem('last_sync_time') || null;
 
+    // Dynamically determine appropriate API URL
+    const isCloud = typeof window !== 'undefined' && window.location.hostname.includes('sandslab.com');
+    this.defaultUrl = isCloud 
+      ? `${window.location.origin}/backend/api/sync.php`
+      : 'https://alrabeesh.sandslab.com/backend/api/sync.php';
+    
+    // Use stored URL only if explicitly customized, otherwise default
+    const savedUrl = localStorage.getItem('clinic_sync_api_url');
+    this.apiUrl = (savedUrl && !savedUrl.includes('alrabeesh.sandslab.com')) ? savedUrl : this.defaultUrl;
+
     this.init();
   }
 
