@@ -133,8 +133,7 @@ class SmartCardReaderService {
       const res = await fetch(restUrl, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
+          'Content-Type': 'text/plain'
         },
         body: JSON.stringify({
           ReadCardInfo: true,
@@ -157,9 +156,13 @@ class SmartCardReaderService {
       if (res.ok) {
         const data = await res.json();
         results.rest.ok = true;
-        if (data.CPR || data.IdNumber || data.EnglishFirstName || data.EnglishFullName) {
+        const misc = data.MiscellaneousTextData || {};
+        const cpr = data.IdNumber || data.CPR || misc.CPRNO;
+        const name = data.EnglishFullName || misc.FirstNameEnglish;
+
+        if (cpr || name) {
           results.hasCard = true;
-          results.rest.message = `CPR Card detected & readable: ${data.EnglishFullName || data.CPR || data.IdNumber}`;
+          results.rest.message = `CPR Card detected & readable: ${name || cpr} (CPR: ${cpr || 'Active'})`;
         } else if (data.ErrorDescription && (data.ErrorDescription.includes('removed') || data.ErrorDescription.includes('smart card'))) {
           results.rest.message = 'Service active & USB reader detected (Ready for card insertion)';
         } else {
@@ -194,7 +197,7 @@ class SmartCardReaderService {
     } else {
       this.isConnected = false;
       this.emit('connectionChange', { status: 'DISCONNECTED' });
-      results.message = 'Could not connect to SCardReadServer on localhost. Please make sure the CIO GCC CardRead Server service is started.';
+      results.message = 'Could not connect to SCardReadServer on localhost. If accessing via HTTPS, please allow Insecure Content in browser site settings.';
     }
 
     return results;
@@ -279,8 +282,7 @@ class SmartCardReaderService {
     const response = await fetch(targetUrl, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
+        'Content-Type': 'text/plain'
       },
       body: JSON.stringify({
         ReadCardInfo: true,
@@ -304,8 +306,11 @@ class SmartCardReaderService {
 
     const json = await response.json();
 
+    const misc = json.MiscellaneousTextData || {};
+    const hasData = json.CPR || json.IdNumber || json.EnglishFirstName || json.EnglishFullName || misc.CPRNO || misc.FirstNameEnglish;
+
     // If server returned an error description with empty cardholder fields
-    if (json.ErrorDescription && !json.CPR && !json.IdNumber && !json.EnglishFirstName && !json.EnglishFullName) {
+    if (json.ErrorDescription && !hasData) {
       throw new Error(json.ErrorDescription);
     }
 
@@ -316,54 +321,93 @@ class SmartCardReaderService {
   parseCardPayload(raw) {
     if (!raw) return null;
 
-    // Support both direct properties and nested CIO structures
-    const cpr = raw.CPR || raw.IdNumber || raw.PersonalNumber || raw.CPRNumber || '';
-    const nameEn = [raw.EnglishFirstName, raw.EnglishSecondName, raw.EnglishThirdName, raw.EnglishLastName]
-      .filter(Boolean)
-      .join(' ') || raw.NameEn || raw.FullNameEn || raw.EnglishName || 'Cardholder Name';
+    const misc = raw.MiscellaneousTextData || {};
 
-    const nameAr = [raw.ArabicFirstName, raw.ArabicSecondName, raw.ArabicThirdName, raw.ArabicLastName]
-      .filter(Boolean)
-      .join(' ') || raw.NameAr || raw.FullNameAr || raw.ArabicName || '';
+    // CPR Number
+    const cpr = raw.CPR || raw.IdNumber || misc.CPRNO || raw.PersonalNumber || raw.CPRNumber || '';
 
-    let formattedDob = raw.DateOfBirth || raw.BirthDate || '';
-    if (formattedDob && formattedDob.length === 8 && !formattedDob.includes('-')) {
-      // YYYYMMDD -> YYYY-MM-DD
-      formattedDob = `${formattedDob.slice(0, 4)}-${formattedDob.slice(4, 6)}-${formattedDob.slice(6, 8)}`;
+    // English Full Name
+    let nameEn = raw.EnglishFullName;
+    if (!nameEn || nameEn.trim() === '') {
+      const parts = [
+        raw.EnglishFirstName || misc.FirstNameEnglish,
+        raw.EnglishSecondName || misc.MiddleName1English,
+        raw.EnglishThirdName || misc.MiddleName2English,
+        raw.EnglishLastName || misc.LastNameEnglish
+      ].filter(Boolean);
+      nameEn = parts.length > 0 ? parts.join(' ') : (raw.NameEn || 'Cardholder Name');
     }
 
-    const gender = (raw.Gender && (raw.Gender.toString().toUpperCase().startsWith('F') || raw.Gender === '2')) ? 'FEMALE' : 'MALE';
-    const nationality = raw.NationalityDescription || raw.Nationality || raw.NationalityCode || 'Bahraini';
-    
-    // Address format
-    const addressParts = [
-      raw.FlatNumber ? `Flat ${raw.FlatNumber}` : '',
-      raw.BuildingNumber ? `Bldg ${raw.BuildingNumber}` : '',
-      raw.RoadNumber ? `Road ${raw.RoadNumber}` : '',
-      raw.BlockNumber ? `Block ${raw.BlockNumber}` : '',
-      raw.AreaName || raw.City || ''
-    ].filter(Boolean);
-    const address = addressParts.length > 0 ? addressParts.join(', ') : (raw.Address || 'Kingdom of Bahrain');
+    // Arabic Full Name
+    let nameAr = raw.ArabicFullName;
+    if (!nameAr || nameAr.trim() === '') {
+      const parts = [
+        raw.ArabicFirstName || misc.FirstNameArabic,
+        raw.ArabicSecondName || misc.MiddleName1Arabic,
+        raw.ArabicThirdName || misc.MiddleName2Arabic,
+        raw.ArabicLastName || misc.LastNameArabic
+      ].filter(Boolean);
+      nameAr = parts.length > 0 ? parts.join(' ') : (raw.NameAr || '');
+    }
+
+    // Date of Birth format normalization
+    let rawDob = raw.BirthDate || misc.DateOfBirth || raw.DateOfBirth || '';
+    let formattedDob = '';
+    if (rawDob) {
+      if (rawDob.includes('/')) {
+        // "16/06/1987" -> "1987-06-16"
+        const parts = rawDob.split('/');
+        if (parts.length === 3) {
+          formattedDob = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+        }
+      } else if (rawDob.length === 8 && !rawDob.includes('-')) {
+        // "19870616" -> "1987-06-16"
+        formattedDob = `${rawDob.slice(0, 4)}-${rawDob.slice(4, 6)}-${rawDob.slice(6, 8)}`;
+      } else {
+        formattedDob = rawDob;
+      }
+    }
+
+    // Gender
+    const rawGender = raw.Gender || misc.Gender || '';
+    const gender = (rawGender.toString().toUpperCase().startsWith('F') || rawGender === '2') ? 'FEMALE' : 'MALE';
+
+    // Nationality
+    const nationality = raw.NationalityDescription || (raw.CardCountry === 'BAH' ? 'Bahraini' : (raw.Nationality || 'Bahraini'));
+
+    // Address
+    const address = raw.AddressEnglish || raw.AddressArabic || [
+      misc.FlatNo ? `Flat ${misc.FlatNo}` : '',
+      misc.BuildingNo ? `Bldg ${misc.BuildingNo}` : '',
+      misc.RoadNo ? `Road ${misc.RoadNo}` : '',
+      misc.BlockNo ? `Block ${misc.BlockNo}` : '',
+      misc.BlockName || '',
+      misc.GovernorateNameEnglish || ''
+    ].filter(Boolean).join(', ') || raw.Address || 'Kingdom of Bahrain';
+
+    // Phone / Mobile
+    const phone = misc.ContactNo || misc.MobileNumber || raw.TelephoneNumber || raw.MobileNumber || '';
+    const email = misc.Email || raw.EmailAddress || '';
 
     // Photo Base64
-    let photoBase64 = raw.Photo || raw.CardHolderPhoto || raw.BiometricPhoto || null;
+    let photoBase64 = raw.PhotoB64Encoded || raw.Photo || raw.CardHolderPhoto || null;
     if (photoBase64 && !photoBase64.startsWith('data:image')) {
       photoBase64 = `data:image/jpeg;base64,${photoBase64}`;
     }
 
     return {
       cpr_number: cpr,
-      full_name_en: nameEn,
-      full_name_ar: nameAr,
+      full_name_en: nameEn.trim(),
+      full_name_ar: nameAr.trim(),
       dob: formattedDob,
       gender: gender,
       nationality: nationality,
-      blood_group: raw.BloodGroup || raw.BloodType || 'O+',
-      phone: raw.TelephoneNumber || raw.MobileNumber || '',
-      email: raw.EmailAddress || '',
+      blood_group: misc.BloodGroup || raw.BloodGroup || raw.BloodType || 'O+',
+      phone: phone,
+      email: email,
       address: address,
-      passport_number: raw.PassportNumber || '',
-      card_expiry: raw.CardExpiryDate || '',
+      passport_number: raw.PassportNumber || misc.PassportNo || '',
+      card_expiry: raw.CardexpiryDate || raw.CardExpiryDate || '',
       photo_base64: photoBase64,
       source: 'CARD_READER',
       read_timestamp: new Date().toISOString()

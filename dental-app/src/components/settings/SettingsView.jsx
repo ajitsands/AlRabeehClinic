@@ -1301,6 +1301,17 @@ export default function SettingsView() {
                 <p>
                   • To manually restart the service, run command: <code className="bg-white dark:bg-slate-800 px-1 py-0.5 rounded font-mono">net start "CIO GCC CardRead Server"</code> in Administrator Command Prompt.
                 </p>
+                <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 space-y-1.5 mt-2">
+                  <span className="font-bold flex items-center gap-1.5 text-xs text-amber-800 dark:text-amber-200">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>Important for Cloud / HTTPS Browser Access ({typeof window !== 'undefined' ? window.location.origin : 'https://alrabeesh.sandslab.com'}):</span>
+                  </span>
+                  <p className="text-[11px] leading-relaxed">
+                    Chrome and Edge security policies block HTTPS pages from connecting to local PC USB hardware (Port 5050). 
+                    <br />
+                    <strong>To allow hardware access:</strong> Click the <strong>🔒 Lock / Tune icon</strong> in the browser address bar ➔ Click <strong>Site settings</strong> ➔ Change <strong>Insecure content</strong> to <strong>Allow</strong> ➔ Refresh the page.
+                  </p>
+                </div>
               </div>
             </div>
 
