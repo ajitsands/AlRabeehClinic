@@ -248,6 +248,20 @@ class SyncEngine {
       this.isSyncing = false;
       const remainingCount = await this.getPendingCount();
 
+      if (deletedCount === 0 && pendingItems.length > 0) {
+        const firstError = resJson.results?.errors?.[0]?.message || 'Server database rejected records';
+        this.emit('syncError', {
+          error: firstError,
+          pendingCount: remainingCount
+        });
+        return {
+          success: false,
+          error: `Sync not applied by server: ${firstError}`,
+          count: 0,
+          remaining: remainingCount
+        };
+      }
+
       this.emit('syncSuccess', {
         lastSync: this.lastSyncTime,
         pendingCount: remainingCount,
