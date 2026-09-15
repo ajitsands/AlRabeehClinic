@@ -56,9 +56,19 @@
 - **100MB File Attachments Engine**: Supports Dental Panoramic X-Rays (OPG), CBCT scans, PDF medical records, and intraoral camera photos stored in IndexedDB and synchronized with the backend.
 
 ### ✅ F. Backend & Production Synchronization
-- **Offline-First Architecture**: Dexie.js (IndexedDB) with bidirectional background sync to MySQL backend.
+- **Offline-First Architecture**: Dexie.js (IndexedDB) with bidirectional background sync to MySQL backend (`sync.php`).
 - **Production Server Apache Configuration**: `.htaccess` configured with SPA rewrites, no-cache headers for `index.html`, and `index.php` fallback router.
 - **Git Repo Optimization**: Large installer binaries excluded via `.gitignore` (`DevelopSupportFilesFolder/`, `dental-app/public/downloads/`), keeping the repository lightweight.
+
+### ✅ G. Live Server Synchronization Center & Queue Inspector Modal
+- **Comprehensive Entity Sync Handlers**: Full MySQL `INSERT ... ON DUPLICATE KEY UPDATE` handlers in `backend/api/sync.php` across all 7 entities: `patients`, `appointments`, `doctors`, `services`, `vitals`, `attachments`, and `settings`.
+- **Preflight & CORS Headers**: Universal `OPTIONS` preflight and `Access-Control-Allow-Origin: *` headers for flawless localhost development and remote cloud synchronization.
+- **Sync Center Modal (`SyncCenterModal.jsx`)**:
+  - Accessible directly by clicking the **"Online / Offline [Count]"** badge in the upper header.
+  - **Live Server Test & Ping**: Real-time HTTP ping test to verify endpoint connectivity (`alrabeesh.sandslab.com/backend/api/sync.php`) with latency ms and status codes.
+  - **Outbox Queue Inspector**: Table listing every queued change (Entity, Operation type, ID, Timestamp) with entity breakdown metrics.
+  - **Action Suite**: Push to Cloud, Simulate Server Sync (clears outbox count for local dev), Export Queue Backup (JSON), and Clear Outbox.
+  - **Resilient Offline Retention**: Local changes are permanently preserved in IndexedDB even if the cloud server is unreachable or offline.
 
 ---
 
