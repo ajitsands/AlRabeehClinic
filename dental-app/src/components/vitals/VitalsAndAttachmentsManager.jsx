@@ -1392,8 +1392,12 @@ export default function VitalsAndAttachmentsManager({ activePatientId, onBackToL
 
               {/* VIEWPORT CANVAS (FORMAT-AWARE) */}
               <div 
-                className={`relative my-3 flex-1 overflow-hidden flex items-center justify-center bg-slate-950 rounded-2xl select-none transition-all ${
-                  isFullscreen ? 'h-[calc(100vh-140px)]' : 'h-[65vh] min-h-[380px]'
+                className={`relative my-2 sm:my-3 flex-1 overflow-hidden flex flex-col items-stretch rounded-2xl select-none transition-all ${
+                  fileType === 'image'
+                    ? 'bg-slate-950 items-center justify-center'
+                    : 'bg-slate-100 dark:bg-slate-900'
+                } ${
+                  isFullscreen ? 'h-[calc(100vh-120px)]' : 'h-[72vh] min-h-[500px]'
                 } ${
                   fileType === 'image'
                     ? zoomScale > 1 
@@ -1403,12 +1407,12 @@ export default function VitalsAndAttachmentsManager({ activePatientId, onBackToL
                       : 'cursor-zoom-in'
                     : 'cursor-default'
                 }`}
-                onWheel={handleWheelZoom}
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp}
-                onDoubleClick={handleDoubleClick}
+                onWheel={fileType === 'image' ? handleWheelZoom : undefined}
+                onMouseDown={fileType === 'image' ? handleMouseDown : undefined}
+                onMouseMove={fileType === 'image' ? handleMouseMove : undefined}
+                onMouseUp={fileType === 'image' ? handleMouseUp : undefined}
+                onMouseLeave={fileType === 'image' ? handleMouseUp : undefined}
+                onDoubleClick={fileType === 'image' ? handleDoubleClick : undefined}
               >
                 {/* 1. IMAGE & X-RAY VIEWER */}
                 {fileType === 'image' && previewAttachment.file_data_base64 && (
@@ -1431,18 +1435,18 @@ export default function VitalsAndAttachmentsManager({ activePatientId, onBackToL
                   </div>
                 )}
 
-                {/* 2. PDF DOCUMENT VIEWER (Embedded in-window) */}
+                {/* 2. PDF DOCUMENT VIEWER (Embedded Full In-Window - Zero Black Bars) */}
                 {fileType === 'pdf' && (
-                  <div className="w-full h-full p-1 sm:p-2 flex flex-col">
+                  <div className="w-full h-full flex-1 flex flex-col p-0 m-0 bg-slate-100 dark:bg-slate-900">
                     {blobUrl ? (
                       <iframe
                         src={`${blobUrl}#view=FitH&toolbar=1`}
-                        className="w-full h-full rounded-xl border border-slate-800 bg-slate-900 shadow-inner"
+                        className="w-full h-full flex-1 rounded-2xl border-0 bg-white shadow-xs"
                         title={previewAttachment.file_name}
                       />
                     ) : (
-                      <div className="flex flex-col items-center justify-center h-full text-slate-400">
-                        <FileText className="w-16 h-16 text-rose-500 mb-2" />
+                      <div className="flex flex-col items-center justify-center h-full min-h-[350px] text-slate-400">
+                        <FileText className="w-16 h-16 text-rose-500 mb-2 animate-bounce" />
                         <p className="font-bold">Loading PDF Document...</p>
                       </div>
                     )}
@@ -1451,7 +1455,7 @@ export default function VitalsAndAttachmentsManager({ activePatientId, onBackToL
 
                 {/* 3. EXCEL & SPREADSHEET VIEWER (CSV Table or Excel Doc Preview) */}
                 {fileType === 'excel' && (
-                  <div className="w-full h-full p-2 sm:p-4 flex flex-col overflow-auto bg-slate-900">
+                  <div className="w-full h-full p-2 sm:p-4 flex flex-col flex-1 overflow-auto bg-slate-900 rounded-2xl">
                     {csvRows.length > 0 ? (
                       <div className="w-full h-full overflow-auto rounded-xl border border-slate-700 bg-slate-950 text-slate-200">
                         <table className="w-full text-left text-xs border-collapse">
@@ -1518,7 +1522,7 @@ export default function VitalsAndAttachmentsManager({ activePatientId, onBackToL
 
                 {/* 4. WORD DOCUMENT VIEWER (DOCX, DOC, RTF) */}
                 {fileType === 'word' && (
-                  <div className="w-full h-full p-4 flex flex-col items-center justify-center text-center bg-slate-900 text-slate-300">
+                  <div className="w-full h-full p-4 flex flex-col flex-1 items-center justify-center text-center bg-slate-900 rounded-2xl text-slate-300">
                     <div className="p-4 bg-blue-950/60 rounded-3xl border border-blue-800 mb-4 text-blue-400">
                       <FileText className="w-16 h-16" />
                     </div>
