@@ -552,7 +552,7 @@ class SmartCardReaderService {
       }
     }
 
-    return 'Bahraini';
+    return '';
   }
 
   // Parses raw CIO Smartcard JSON to normalized Clinic Patient model

@@ -127,7 +127,7 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
     setFormEmail('');
     setFormDob('');
     setFormGender('MALE');
-    setFormNationality('Bahraini');
+    setFormNationality('');
     setFormBloodGroup('O+');
     setFormAddress('');
     setFormEmergencyName('');
@@ -148,7 +148,7 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
     setFormNameAr(card.full_name_ar || '');
     setFormDob(card.dob || '');
     setFormGender(card.gender || 'MALE');
-    setFormNationality(card.nationality || 'Bahraini');
+    setFormNationality(card.nationality || '');
     setFormBloodGroup(card.blood_group || 'O+');
     setFormAddress(card.address || '');
     setFormPhoto(card.photo_base64 || '');
@@ -519,7 +519,7 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
                   <div>
                     <span className="text-slate-400 text-[10px] font-bold uppercase block">Nationality & DOB</span>
                     <span className="text-slate-600 dark:text-slate-300">
-                      {patient.nationality || 'Bahraini'} • {formatDate(patient.dob)}
+                      {patient.nationality || '—'} {patient.dob ? `• ${formatDate(patient.dob)}` : ''}
                     </span>
                   </div>
                   <div>
@@ -887,7 +887,7 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
                     type="text"
                     value={formNationality}
                     onChange={(e) => setFormNationality(e.target.value)}
-                    placeholder="e.g. Bahraini"
+                    placeholder="e.g. Bahraini, Indian, Filipino..."
                     className="w-full px-3 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
                   />
                 </div>
