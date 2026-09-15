@@ -484,25 +484,25 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
             </div>
 
             {/* Smart Card Quick-Autofill Banner */}
-            <div className="my-4 p-4 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border border-blue-200 dark:border-blue-900 flex flex-col sm:flex-row items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <CreditCard className="w-8 h-8 text-blue-600 dark:text-blue-400 shrink-0" />
-                <div>
+            <div className="my-4 p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border border-blue-200 dark:border-blue-900 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
+              <div className="flex items-center gap-3 shrink min-w-0">
+                <CreditCard className="w-7 h-7 sm:w-8 sm:h-8 text-blue-600 dark:text-blue-400 shrink-0" />
+                <div className="min-w-0">
                   <h4 className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white">
                     Instant Smart Card Intake
                   </h4>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate sm:whitespace-normal">
                     Insert CPR Card into reader and click scan to autofill all personal info & photo.
                   </p>
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0 flex-nowrap">
                 <button
                   type="button"
                   onClick={() => handleScanCardInModal(false, 0, 'standard')}
                   disabled={isReadingCard}
-                  className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-sm transition flex items-center gap-1.5 cursor-pointer"
+                  className="px-3 py-1.5 sm:px-3.5 sm:py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
                   title="Scan Standard CPR Card (chip on front)"
                 >
                   <CreditCard className={`w-3.5 h-3.5 ${isReadingCard ? 'animate-spin' : ''}`} />
@@ -512,7 +512,7 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
                   type="button"
                   onClick={() => handleScanCardInModal(false, 0, 'new_bahrain')}
                   disabled={isReadingCard}
-                  className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs rounded-xl shadow-sm transition flex items-center gap-1.5 cursor-pointer"
+                  className="px-3 py-1.5 sm:px-3.5 sm:py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
                   title="Scan New Issue Bahrain Smart Card (chip on back side)"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
@@ -521,7 +521,7 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
                 <button
                   type="button"
                   onClick={() => handleScanCardInModal(true, 0)}
-                  className="px-2.5 py-2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 text-slate-700 dark:text-slate-300 font-bold text-xs rounded-xl transition cursor-pointer"
+                  className="px-2.5 py-1.5 sm:py-2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs rounded-xl transition cursor-pointer whitespace-nowrap shrink-0 shadow-2xs"
                   title="Test using simulated card"
                 >
                   Simulator
