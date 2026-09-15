@@ -6,6 +6,7 @@ import PatientListAndRegistration from './components/patients/PatientListAndRegi
 import VitalsAndAttachmentsManager from './components/vitals/VitalsAndAttachmentsManager';
 import DoctorManagement from './components/doctors/DoctorManagement';
 import ServicesCatalog from './components/services/ServicesCatalog';
+import BranchesAndUsersView from './components/branches/BranchesAndUsersView';
 import SettingsView from './components/settings/SettingsView';
 import Toast from './components/common/Toast';
 import SandsLabModal from './components/common/SandsLabModal';
@@ -73,7 +74,12 @@ function DentalClinicApp() {
           <ServicesCatalog />
         )}
 
-        {/* TAB 6: Settings & Gulf/India Localization */}
+        {/* TAB 6: Multi-Branch & Staff User Access Management */}
+        {activeTab === 'branches_users' && (
+          <BranchesAndUsersView />
+        )}
+
+        {/* TAB 7: Settings & Gulf/India Localization */}
         {activeTab === 'settings' && (
           <SettingsView />
         )}

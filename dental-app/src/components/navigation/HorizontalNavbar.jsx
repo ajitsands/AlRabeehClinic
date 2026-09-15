@@ -67,6 +67,7 @@ export default function HorizontalNavbar({ onOpenNewPatient, onOpenNewAppointmen
     { id: 'vitals', label: 'Vitals & Clinical X-Rays', icon: Activity },
     { id: 'doctors', label: 'Doctors & Dental Chairs', icon: Stethoscope },
     { id: 'services', label: 'Dental Services & Fees', icon: Sparkles },
+    { id: 'branches_users', label: 'Branches & Users', icon: Building2, badge: `${branches.length} Br` },
     { id: 'settings', label: 'Settings & Localization', icon: Settings },
   ];
 
