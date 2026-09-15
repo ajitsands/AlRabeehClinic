@@ -657,6 +657,7 @@ export function AppProvider({ children }) {
         syncNow: (opts) => syncEngine.syncNow(opts),
         clearOutbox: () => syncEngine.clearOutbox(),
         testConnection: (url) => syncEngine.testConnection(url),
+        getPendingSyncItems: () => syncEngine.getPendingItems(),
         syncEngine,
         reconcileDoctorAccounts,
         resetToFreshDemoData,

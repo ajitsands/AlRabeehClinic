@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { db } from '../../db/indexedDB';
 import { useApp } from '../../context/AppContext';
 import { 
   X, 
@@ -12,16 +13,16 @@ import {
   Trash2, 
   Download, 
   Play, 
-  Info,
-  Clock,
-  Layers,
-  ArrowUpRight,
-  Sparkles,
-  Check,
-  AlertTriangle,
-  FileText,
-  HelpCircle,
-  ShieldCheck
+  Info, 
+  Clock, 
+  Layers, 
+  ArrowUpRight, 
+  Sparkles, 
+  Check, 
+  AlertTriangle, 
+  FileText, 
+  HelpCircle, 
+  ShieldCheck 
 } from 'lucide-react';
 
 export default function SyncCenterModal({ isOpen, onClose }) {
@@ -38,7 +39,7 @@ export default function SyncCenterModal({ isOpen, onClose }) {
     formatDate
   } = useApp();
 
-  const [targetUrl, setTargetUrl] = useState(syncEngine.getApiUrl());
+  const [targetUrl, setTargetUrl] = useState(syncEngine?.getApiUrl() || '');
   const [testResult, setTestResult] = useState(null);
   const [isTesting, setIsTesting] = useState(false);
   const [pendingItems, setPendingItems] = useState([]);
@@ -54,7 +55,9 @@ export default function SyncCenterModal({ isOpen, onClose }) {
   useEffect(() => {
     if (isOpen) {
       loadPendingList();
-      setTargetUrl(syncEngine.getApiUrl());
+      if (syncEngine?.getApiUrl) {
+        setTargetUrl(syncEngine.getApiUrl());
+      }
       setTestResult(null);
       setSyncStatusMsg(null);
       setConfirmDialog(null);
@@ -62,9 +65,23 @@ export default function SyncCenterModal({ isOpen, onClose }) {
   }, [isOpen, pendingSyncCount]);
 
   const loadPendingList = async () => {
-    if (getPendingSyncItems) {
-      const items = await getPendingSyncItems();
-      setPendingItems(items || []);
+    try {
+      if (getPendingSyncItems) {
+        const items = await getPendingSyncItems();
+        setPendingItems(items || []);
+      } else if (syncEngine?.getPendingItems) {
+        const items = await syncEngine.getPendingItems();
+        setPendingItems(items || []);
+      } else {
+        const items = await db.outbox_sync.where('status').equals('PENDING').reverse().toArray();
+        setPendingItems(items || []);
+      }
+    } catch (e) {
+      console.error('Failed to load pending sync list:', e);
+      try {
+        const allItems = await db.outbox_sync.toArray();
+        setPendingItems(allItems.filter(i => i.status === 'PENDING').reverse());
+      } catch (err) {}
     }
   };
 
