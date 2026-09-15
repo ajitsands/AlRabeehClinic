@@ -71,13 +71,16 @@ export default function HorizontalNavbar({ onOpenNewPatient, onOpenNewAppointmen
     { id: 'settings', label: 'Settings & Localization', icon: Settings },
   ];
 
-  const handleQuickCardRead = async (isSim = false, preset = 0) => {
+  const handleQuickCardRead = async (isSim = false, preset = 0, cardType = 'standard') => {
     setIsReadingCard(true);
     try {
-      await triggerSmartCardRead(isSim, preset);
+      if (cardType === 'new_bahrain') {
+        showToast('Scanning New Bahrain Smart Card (Chip on Back)...', 'info', 3500);
+      }
+      await triggerSmartCardRead(isSim, preset, cardType);
       onOpenNewPatient(); // Open registration modal with scanned card filled
     } catch (err) {
-      showToast('Smart Card reader not responding. You can use the Simulator fallback option.', 'warning');
+      showToast(err.message || 'Smart Card reader notice. Please check card insertion.', 'warning', 6000);
       setShowSimMenu(true);
     } finally {
       setIsReadingCard(false);
@@ -277,31 +280,69 @@ export default function HorizontalNavbar({ onOpenNewPatient, onOpenNewAppointmen
                 </button>
               </div>
 
-              {/* Simulator Dropdown */}
+              {/* Smart Card Selection & Presets Dropdown */}
               {showSimMenu && (
-                <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-white dark:bg-slate-800 shadow-xl border border-slate-200 dark:border-slate-700 py-2 z-50 text-xs">
-                  <div className="px-3 py-1 font-semibold text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-700">
-                    Smart Card Quick-Test Presets
+                <div className="absolute right-0 mt-2 w-72 rounded-2xl bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-slate-700 py-2 z-50 text-xs">
+                  <div className="px-3.5 py-1.5 font-extrabold text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                    <span>Physical Smart Card Intake</span>
+                    <span className="px-1.5 py-0.2 rounded bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-[9px] font-bold">USB Hardware</span>
                   </div>
+
+                  {/* Option 1: Standard CPR Card */}
                   <button
-                    onClick={() => { setShowSimMenu(false); handleQuickCardRead(true, 0); }}
-                    className="w-full text-left px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 flex flex-col gap-0.5 cursor-pointer"
+                    type="button"
+                    onClick={() => { setShowSimMenu(false); handleQuickCardRead(false, 0, 'standard'); }}
+                    className="w-full text-left px-3.5 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-750 flex items-start gap-2.5 transition cursor-pointer border-b border-slate-100/80 dark:border-slate-700/80"
                   >
-                    <span className="font-semibold text-slate-800 dark:text-slate-200">Abdulla Al-Doseri (Bahraini)</span>
+                    <CreditCard className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+                    <div>
+                      <span className="font-extrabold text-slate-900 dark:text-white block">Standard CPR Card</span>
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400">Regular Bahrain National ID (Chip on Front)</span>
+                    </div>
+                  </button>
+
+                  {/* Option 2: New Bahrain Card (Chip on Back) */}
+                  <button
+                    type="button"
+                    onClick={() => { setShowSimMenu(false); handleQuickCardRead(false, 0, 'new_bahrain'); }}
+                    className="w-full text-left px-3.5 py-2.5 hover:bg-amber-50/60 dark:hover:bg-amber-950/30 flex items-start gap-2.5 transition cursor-pointer border-b border-slate-100/80 dark:border-slate-700/80"
+                  >
+                    <Sparkles className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-extrabold text-slate-900 dark:text-white">New Bahrain Smart Card</span>
+                        <span className="px-1.5 py-0.2 text-[9px] font-bold uppercase rounded bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300">Back Chip</span>
+                      </div>
+                      <span className="text-[11px] text-amber-700 dark:text-amber-300">New Issue Bahrain ID (Chip on Back side)</span>
+                    </div>
+                  </button>
+
+                  <div className="px-3.5 py-1.5 font-bold text-[10px] uppercase tracking-wider text-slate-400 bg-slate-50/50 dark:bg-slate-850">
+                    Simulator Fallback Presets
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => { setShowSimMenu(false); handleQuickCardRead(true, 0); }}
+                    className="w-full text-left px-3.5 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 flex flex-col gap-0.5 cursor-pointer"
+                  >
+                    <span className="font-bold text-slate-800 dark:text-slate-200">Abdulla Al-Doseri (Bahraini)</span>
                     <span className="text-[11px] text-slate-500">CPR: 910814992 • Muharraq</span>
                   </button>
                   <button
+                    type="button"
                     onClick={() => { setShowSimMenu(false); handleQuickCardRead(true, 1); }}
-                    className="w-full text-left px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 flex flex-col gap-0.5 cursor-pointer"
+                    className="w-full text-left px-3.5 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 flex flex-col gap-0.5 cursor-pointer"
                   >
-                    <span className="font-semibold text-slate-800 dark:text-slate-200">Maryam Al-Ghatam (Bahraini)</span>
+                    <span className="font-bold text-slate-800 dark:text-slate-200">Maryam Al-Ghatam (Bahraini)</span>
                     <span className="text-[11px] text-slate-500">CPR: 870422119 • Seef</span>
                   </button>
                   <button
+                    type="button"
                     onClick={() => { setShowSimMenu(false); handleQuickCardRead(true, 2); }}
-                    className="w-full text-left px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 flex flex-col gap-0.5 cursor-pointer"
+                    className="w-full text-left px-3.5 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 flex flex-col gap-0.5 cursor-pointer"
                   >
-                    <span className="font-semibold text-slate-800 dark:text-slate-200">Vikram S. Pillai (Indian)</span>
+                    <span className="font-bold text-slate-800 dark:text-slate-200">Vikram S. Pillai (Indian)</span>
                     <span className="text-[11px] text-slate-500">CPR: 940608553 • Adliya</span>
                   </button>
                 </div>

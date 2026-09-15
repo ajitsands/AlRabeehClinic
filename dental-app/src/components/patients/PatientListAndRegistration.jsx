@@ -138,15 +138,18 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
     }
   }, [lastScannedCard]);
 
-  // Read Card directly inside the modal
-  const handleScanCardInModal = async (isSim = false, preset = 0) => {
+  // Read Card directly inside the modal with Standard vs New Card support
+  const handleScanCardInModal = async (isSim = false, preset = 0, cardType = 'standard') => {
     setIsReadingCard(true);
     try {
-      const card = await triggerSmartCardRead(isSim, preset);
+      if (cardType === 'new_bahrain') {
+        showToast('Reading New Bahrain Card (Chip on Back)...', 'info', 3000);
+      }
+      const card = await triggerSmartCardRead(isSim, preset, cardType);
       populateFormWithCardData(card);
       showToast('Smart Card data extracted successfully!', 'success');
     } catch (err) {
-      showToast('No card detected in reader. Running simulator fallback...', 'warning');
+      showToast(err.message || 'No card detected in reader. Running simulator fallback...', 'warning');
       const simCard = await triggerSmartCardRead(true, 0);
       populateFormWithCardData(simCard);
     } finally {
@@ -489,20 +492,31 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => handleScanCardInModal(false)}
+                  onClick={() => handleScanCardInModal(false, 0, 'standard')}
                   disabled={isReadingCard}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-sm transition flex items-center gap-1.5"
+                  className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-sm transition flex items-center gap-1.5 cursor-pointer"
+                  title="Scan Standard CPR Card (chip on front)"
                 >
                   <CreditCard className={`w-3.5 h-3.5 ${isReadingCard ? 'animate-spin' : ''}`} />
-                  <span>{isReadingCard ? 'Reading...' : 'Scan CPR Card'}</span>
+                  <span>{isReadingCard ? 'Reading...' : 'Scan Standard CPR'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleScanCardInModal(false, 0, 'new_bahrain')}
+                  disabled={isReadingCard}
+                  className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs rounded-xl shadow-sm transition flex items-center gap-1.5 cursor-pointer"
+                  title="Scan New Issue Bahrain Smart Card (chip on back side)"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Scan New Card (Back Chip)</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => handleScanCardInModal(true, 0)}
-                  className="px-3 py-2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 text-slate-700 dark:text-slate-300 font-bold text-xs rounded-xl transition"
+                  className="px-2.5 py-2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 text-slate-700 dark:text-slate-300 font-bold text-xs rounded-xl transition cursor-pointer"
                   title="Test using simulated card"
                 >
                   Simulator

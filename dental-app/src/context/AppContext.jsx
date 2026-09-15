@@ -607,15 +607,15 @@ export function AppProvider({ children }) {
     }
   };
 
-  // Trigger Smart Card Read (Real or Simulation fallback)
-  const triggerSmartCardRead = async (useSimulation = false, presetIndex = 0) => {
+  // Trigger Smart Card Read (Real or Simulation fallback, with Standard vs New Bahrain Card support)
+  const triggerSmartCardRead = async (useSimulation = false, presetIndex = 0, cardType = 'standard') => {
     try {
       if (useSimulation) {
         return await smartCardService.simulateCardRead(presetIndex);
       }
-      return await smartCardService.readSmartCard();
+      return await smartCardService.readSmartCard({ cardType });
     } catch (err) {
-      console.warn('Physical card read failed, opening simulator fallback option', err);
+      console.warn('Physical card read notice:', err);
       throw err;
     }
   };
