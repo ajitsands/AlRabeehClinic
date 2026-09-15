@@ -1,4 +1,11 @@
 <?php
+// Increase memory and payload limits for clinical attachments and X-Rays
+@ini_set('upload_max_filesize', '128M');
+@ini_set('post_max_size', '128M');
+@ini_set('memory_limit', '512M');
+@ini_set('max_execution_time', '300');
+@ini_set('max_input_time', '300');
+
 // CORS Headers for multi-origin & local development support
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
@@ -417,15 +424,23 @@ if ($method === 'POST' && $action === 'push') {
                 }
             }
 
-            // Log sync safely
+            // Log sync safely (sanitize heavy base64 so sync_logs remains lightweight)
             try {
+                $logPayload = $payload;
+                if (isset($logPayload['file_data_base64']) && strlen($logPayload['file_data_base64']) > 500) {
+                    $logPayload['file_data_base64'] = '[BASE64_DATA_' . strlen($logPayload['file_data_base64']) . '_BYTES]';
+                }
+                if (isset($logPayload['photo_url']) && strlen($logPayload['photo_url']) > 500 && str_starts_with($logPayload['photo_url'], 'data:')) {
+                    $logPayload['photo_url'] = '[BASE64_PHOTO_' . strlen($logPayload['photo_url']) . '_BYTES]';
+                }
+
                 $logStmt = $db->prepare("INSERT INTO sync_logs (id, client_device_id, entity_type, entity_id, action, payload) VALUES (UUID(), :device, :type, :eid, :act, :pay)");
                 $logStmt->execute([
                     ':device' => $deviceId,
                     ':type' => $entityType,
                     ':eid' => $entityId,
                     ':act' => $operation,
-                    ':pay' => json_encode($payload)
+                    ':pay' => json_encode($logPayload)
                 ]);
             } catch (Exception $logErr) {
                 // Ignore log table errors so main record sync succeeds

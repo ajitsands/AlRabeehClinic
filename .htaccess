@@ -25,6 +25,31 @@ DirectoryIndex index.html dental-app/dist/index.html index.php
 # Prevent 403 on directory listing
 Options -Indexes +FollowSymLinks
 
+# Allow large requests for clinical attachments & dental X-Rays (up to 128MB)
+LimitRequestBody 134217728
+
+<IfModule mod_php.c>
+    php_value upload_max_filesize 128M
+    php_value post_max_size 128M
+    php_value memory_limit 512M
+    php_value max_execution_time 300
+    php_value max_input_time 300
+</IfModule>
+<IfModule mod_php7.c>
+    php_value upload_max_filesize 128M
+    php_value post_max_size 128M
+    php_value memory_limit 512M
+    php_value max_execution_time 300
+    php_value max_input_time 300
+</IfModule>
+<IfModule mod_php8.c>
+    php_value upload_max_filesize 128M
+    php_value post_max_size 128M
+    php_value memory_limit 512M
+    php_value max_execution_time 300
+    php_value max_input_time 300
+</IfModule>
+
 # Disable caching for index files so updates reflect immediately
 <IfModule mod_headers.c>
     <FilesMatch "\.(html|php)$">

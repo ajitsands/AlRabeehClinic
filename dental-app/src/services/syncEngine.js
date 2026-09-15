@@ -165,7 +165,7 @@ class SyncEngine {
     }
   }
 
-  // Trigger synchronization
+  // Trigger synchronization with intelligent size chunking and HTTP 413 fallback
   async syncNow({ forceMock = false } = {}) {
     if (this.isSyncing) return { success: false, message: 'Sync already in progress' };
     this.isSyncing = true;
@@ -206,40 +206,112 @@ class SyncEngine {
         return { success: true, count: pendingItems.length, message: `Simulated sync for ${pendingItems.length} records.` };
       }
 
-      // Real HTTP Sync with Server
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      // Group items into size-safe batches to prevent HTTP 413 (Request Entity Too Large)
+      const batches = [];
+      let currentBatch = [];
+      let currentBatchSizeBytes = 0;
+      const MAX_BATCH_BYTES = 300 * 1024; // 300 KB safe chunk threshold
+      const MAX_BATCH_ITEMS = 10;
 
-      const response = await fetch(`${this.apiUrl}?action=push`, {
-        method: 'POST',
-        signal: controller.signal,
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({
-          deviceId: localStorage.getItem('clinic_device_id') || 'BROWSER_CLIENT_1',
-          items: pendingItems
-        })
-      });
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        throw new Error(`Server returned HTTP ${response.status} (${response.statusText || 'Endpoint Error'})`);
-      }
-
-      const resJson = await response.json();
-      if (!resJson.success) {
-        throw new Error(resJson.message || 'Server rejected sync batch');
-      }
-
-      // Process synced IDs from response
-      const syncedIds = resJson.results?.syncedIds || [];
-      let deletedCount = 0;
       for (const item of pendingItems) {
-        if (syncedIds.includes(item.id)) {
-          await db.outbox_sync.delete(item.auto_id);
-          deletedCount++;
+        const itemSize = JSON.stringify(item).length;
+        // Large items (attachments or items > 300KB) get their own dedicated single-item batch
+        if (item.entityType === 'attachments' || itemSize > MAX_BATCH_BYTES) {
+          if (currentBatch.length > 0) {
+            batches.push(currentBatch);
+            currentBatch = [];
+            currentBatchSizeBytes = 0;
+          }
+          batches.push([item]);
+        } else {
+          if (currentBatch.length >= MAX_BATCH_ITEMS || (currentBatchSizeBytes + itemSize > MAX_BATCH_BYTES && currentBatch.length > 0)) {
+            batches.push(currentBatch);
+            currentBatch = [item];
+            currentBatchSizeBytes = itemSize;
+          } else {
+            currentBatch.push(item);
+            currentBatchSizeBytes += itemSize;
+          }
+        }
+      }
+      if (currentBatch.length > 0) {
+        batches.push(currentBatch);
+      }
+
+      let totalSynced = 0;
+      const errors = [];
+      const deviceId = localStorage.getItem('clinic_device_id') || 'BROWSER_CLIENT_1';
+
+      for (const batch of batches) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 45000); // 45s for large attachments
+
+          const response = await fetch(`${this.apiUrl}?action=push`, {
+            method: 'POST',
+            signal: controller.signal,
+            headers: { 
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+              deviceId,
+              items: batch
+            })
+          });
+          clearTimeout(timeoutId);
+
+          if (!response.ok) {
+            if (response.status === 413) {
+              // If batch got 413 and had multiple items, attempt item-by-item fallback
+              if (batch.length > 1) {
+                for (const singleItem of batch) {
+                  try {
+                    const singleRes = await fetch(`${this.apiUrl}?action=push`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                      body: JSON.stringify({ deviceId, items: [singleItem] })
+                    });
+                    if (singleRes.ok) {
+                      const singleJson = await singleRes.json();
+                      if (singleJson.success && singleJson.results?.syncedIds?.includes(singleItem.id)) {
+                        await db.outbox_sync.delete(singleItem.auto_id);
+                        totalSynced++;
+                      }
+                    } else {
+                      errors.push(`Item ${singleItem.entityType} (${singleItem.id}): HTTP ${singleRes.status}`);
+                    }
+                  } catch (itemErr) {
+                    errors.push(`Item ${singleItem.entityType}: ${itemErr.message}`);
+                  }
+                }
+                continue;
+              } else {
+                errors.push(`Attachment "${batch[0]?.payload?.file_name || batch[0]?.id}" exceeds server upload limits (HTTP 413)`);
+                continue;
+              }
+            }
+            throw new Error(`Server returned HTTP ${response.status} (${response.statusText || 'Endpoint Error'})`);
+          }
+
+          const resJson = await response.json();
+          if (resJson.success) {
+            const syncedIds = resJson.results?.syncedIds || [];
+            for (const item of batch) {
+              if (syncedIds.includes(item.id)) {
+                await db.outbox_sync.delete(item.auto_id);
+                totalSynced++;
+              }
+            }
+            if (resJson.results?.errors?.length > 0) {
+              errors.push(...resJson.results.errors.map(e => e.message || 'Record sync error'));
+            }
+          } else {
+            errors.push(resJson.message || 'Server rejected sync batch');
+          }
+        } catch (batchErr) {
+          console.warn('Sync batch error:', batchErr);
+          errors.push(batchErr.message || 'Batch sync failed');
         }
       }
 
@@ -247,40 +319,42 @@ class SyncEngine {
       localStorage.setItem('last_sync_time', this.lastSyncTime);
       this.isSyncing = false;
       const remainingCount = await this.getPendingCount();
+      this.emit('outboxUpdated', remainingCount);
 
-      if (deletedCount === 0 && pendingItems.length > 0) {
-        const firstError = resJson.results?.errors?.[0]?.message || 'Server database rejected records';
+      if (totalSynced > 0) {
+        this.emit('syncSuccess', {
+          lastSync: this.lastSyncTime,
+          pendingCount: remainingCount,
+          syncedCount: totalSynced,
+          message: remainingCount === 0 
+            ? `Successfully synchronized all ${totalSynced} records with server`
+            : `Synchronized ${totalSynced} records (${remainingCount} remaining)`
+        });
+
+        return {
+          success: remainingCount === 0,
+          count: totalSynced,
+          remaining: remainingCount,
+          errors: errors.length > 0 ? errors : undefined
+        };
+      } else {
+        const firstError = errors[0] || 'Sync could not be completed';
         this.emit('syncError', {
           error: firstError,
           pendingCount: remainingCount
         });
+
         return {
           success: false,
-          error: `Sync not applied by server: ${firstError}`,
-          count: 0,
-          remaining: remainingCount
+          error: firstError,
+          pendingCount: remainingCount
         };
       }
-
-      this.emit('syncSuccess', {
-        lastSync: this.lastSyncTime,
-        pendingCount: remainingCount,
-        syncedCount: deletedCount,
-        message: `Successfully synchronized ${deletedCount} records with server`
-      });
-      this.emit('outboxUpdated', remainingCount);
-
-      return {
-        success: true,
-        count: deletedCount,
-        remaining: remainingCount,
-        results: resJson.results
-      };
 
     } catch (err) {
       this.isSyncing = false;
       const remainingCount = await this.getPendingCount();
-      const errorMsg = err.name === 'AbortError' ? 'Sync timed out after 10s' : (err.message || 'Server unreachable');
+      const errorMsg = err.name === 'AbortError' ? 'Sync timed out' : (err.message || 'Server unreachable');
 
       this.emit('syncError', {
         error: errorMsg,
