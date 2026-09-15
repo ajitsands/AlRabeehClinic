@@ -34,7 +34,7 @@ import {
 } from 'lucide-react';
 
 export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen, setIsModalOpen, preselectedSlot, setPreselectedSlot }) {
-  const { formatCurrency, formatDate, showToast, settings, activeBranchId, activeBranch, branches } = useApp();
+  const { formatCurrency, formatDate, showToast, settings, activeBranchId, activeBranch, branches, reconcileDoctorAccounts } = useApp();
 
   const timeSlots = generateClinicTimeSlots(
     settings.clinic_open_time || '09:00',
@@ -87,12 +87,17 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
 
   // Load Data with Branch Filtering
   const loadData = async () => {
-    const allDocs = await db.doctors.filter(d => d.is_active).toArray();
-    // Filter doctors practicing at current active branch
+    if (reconcileDoctorAccounts) {
+      await reconcileDoctorAccounts();
+    }
+    const allDocs = await db.doctors.toArray();
+    // Filter active doctors practicing at current active branch
     const docs = allDocs.filter(d => 
-      !d.primary_branch_id || 
-      d.primary_branch_id === activeBranchId || 
-      (d.branch_ids && d.branch_ids.includes(activeBranchId))
+      d.is_active !== false && (
+        !d.primary_branch_id || 
+        d.primary_branch_id === activeBranchId || 
+        (d.branches_assigned && d.branches_assigned.includes(activeBranchId))
+      )
     );
 
     const srvs = await db.services.filter(s => s.is_active).toArray();
@@ -102,7 +107,7 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
     const allApps = await db.appointments.where('appointment_date').equals(selectedDate).toArray();
     const apps = allApps.filter(a => !a.branch_id || a.branch_id === activeBranchId);
 
-    setDoctors(docs.length > 0 ? docs : allDocs); // Fallback to all docs if none mapped
+    setDoctors(docs.length > 0 ? docs : allDocs.filter(d => d.is_active !== false)); // Fallback to all docs if none mapped
     setServices(srvs);
     setPatients(pts);
     setAppointments(apps);
@@ -633,11 +638,11 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
       {/* SINGLE WINDOW MULTI-DOCTOR MATRIX */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <div className="min-w-[1100px]">
+          <div style={{ minWidth: `${Math.max(1100, (displayedDoctors.length * 240) + 110)}px` }}>
             
             {/* Table Header: Doctors Side-by-Side */}
             <div className="grid border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 sticky top-0 z-20"
-              style={{ gridTemplateColumns: `100px repeat(${displayedDoctors.length}, minmax(200px, 1fr))` }}
+              style={{ gridTemplateColumns: `100px repeat(${displayedDoctors.length}, minmax(230px, 1fr))` }}
             >
               {/* Corner Slot label */}
               <div className="p-3.5 flex items-center justify-center font-bold text-xs text-slate-500 dark:text-slate-400 border-r border-slate-200 dark:border-slate-800">
@@ -655,7 +660,7 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
                   <img
                     src={doc.photo_url}
                     alt={doc.name}
-                    className="w-10 h-10 rounded-full object-cover border-2 border-white dark:border-slate-700 shadow-xs"
+                    className="w-10 h-10 rounded-full object-cover border-2 border-white dark:border-slate-700 shadow-xs shrink-0"
                   />
                   <div className="min-w-0 flex-1">
                     <h4 className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white truncate">
@@ -683,7 +688,7 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
                   <div
                     key={timeSlot}
                     className={`grid min-h-[88px] ${isBreak ? 'bg-amber-50/20 dark:bg-amber-950/10' : ''}`}
-                    style={{ gridTemplateColumns: `100px repeat(${displayedDoctors.length}, minmax(200px, 1fr))` }}
+                    style={{ gridTemplateColumns: `100px repeat(${displayedDoctors.length}, minmax(230px, 1fr))` }}
                   >
                     {/* Time Label Column */}
                     <div className={`p-2 border-r border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center ${

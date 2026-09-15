@@ -139,11 +139,113 @@ export function AppProvider({ children }) {
     }
   };
 
+  // Color palette for dynamic doctors
+  const DOCTOR_COLORS = ['#2563EB', '#0284C7', '#059669', '#7C3AED', '#D97706', '#DB2777', '#0D9488', '#DC2626'];
+
+  // Doctor avatar presets
+  const DOCTOR_AVATARS = [
+    'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=200&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1594824813598-a1c6a6f65152?w=200&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=200&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=200&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1537368910025-700350fe46c7?w=200&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1582750433449-648ed127bb54?w=200&auto=format&fit=crop&q=80'
+  ];
+
+  // Reconcile Users (role === 'DOCTOR') and db.doctors
+  const reconcileDoctorAccounts = async (usersList = null) => {
+    try {
+      const allUsers = usersList || await db.users.toArray();
+      const allDocs = await db.doctors.toArray();
+      const allBranches = await db.branches.toArray();
+
+      const doctorUsers = allUsers.filter(u => u.role === 'DOCTOR');
+
+      for (let i = 0; i < doctorUsers.length; i++) {
+        const u = doctorUsers[i];
+        // Match existing doctor by id, user id, or full name
+        const existingDoc = allDocs.find(d => 
+          d.id === u.id || 
+          d.id === u.id.replace('usr-', 'doc-') ||
+          d.id === u.id.replace('user-', 'doc-') ||
+          d.name?.toLowerCase().trim() === u.full_name?.toLowerCase().trim()
+        );
+
+        const targetBranchId = u.branch_id || 'branch-mnm';
+        const branchObj = allBranches.find(b => b.id === targetBranchId);
+        const branchPrefix = branchObj ? branchObj.name.replace('Al Rabeesh ', '').split(' ')[0] : 'Clinic';
+        
+        // Find existing chairs in this branch
+        const branchDocs = allDocs.filter(d => d.primary_branch_id === targetBranchId);
+        const chairIndex = branchDocs.length + 1;
+
+        if (!existingDoc) {
+          const newDoc = {
+            id: u.id.startsWith('usr-') ? u.id.replace('usr-', 'doc-') : `doc-${u.username?.toLowerCase().replace(/[^a-z0-9]/g, '') || Date.now()}`,
+            name: u.full_name,
+            specialty: u.specialty || 'General Dental Surgeon',
+            qualification: u.qualification || 'BDS Dental Surgeon',
+            primary_branch_id: targetBranchId,
+            branches_assigned: [targetBranchId],
+            room_number: `Room ${100 + chairIndex}`,
+            chair_number: `${branchPrefix} Chair ${chairIndex}`,
+            phone: u.phone || '',
+            email: u.email || '',
+            photo_url: u.photo_url || DOCTOR_AVATARS[i % DOCTOR_AVATARS.length],
+            color_tag: DOCTOR_COLORS[i % DOCTOR_COLORS.length],
+            start_time: '09:00',
+            end_time: '17:30',
+            slot_duration_mins: 30,
+            is_active: u.is_active !== false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+          await db.doctors.put(newDoc);
+          await syncEngine.queueChange('doctors', newDoc.id, 'INSERT', newDoc);
+          allDocs.push(newDoc);
+        } else {
+          // Sync branch and active status if changed
+          let changed = false;
+          if (existingDoc.primary_branch_id !== targetBranchId) {
+            existingDoc.primary_branch_id = targetBranchId;
+            existingDoc.branches_assigned = [targetBranchId];
+            changed = true;
+          }
+          if (existingDoc.name !== u.full_name) {
+            existingDoc.name = u.full_name;
+            changed = true;
+          }
+          if (existingDoc.is_active !== (u.is_active !== false)) {
+            existingDoc.is_active = (u.is_active !== false);
+            changed = true;
+          }
+          if (u.phone && existingDoc.phone !== u.phone) {
+            existingDoc.phone = u.phone;
+            changed = true;
+          }
+          if (u.email && existingDoc.email !== u.email) {
+            existingDoc.email = u.email;
+            changed = true;
+          }
+          if (changed) {
+            existingDoc.updated_at = new Date().toISOString();
+            await db.doctors.put(existingDoc);
+            await syncEngine.queueChange('doctors', existingDoc.id, 'UPDATE', existingDoc);
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Failed to reconcile doctor accounts:', e);
+    }
+  };
+
   // Load Users from Database
   const refreshUsers = async () => {
     try {
       const allUsers = await db.users.toArray();
       setUsers(allUsers);
+      await reconcileDoctorAccounts(allUsers);
+
       const savedUserId = localStorage.getItem('clinic_current_user_id');
       if (savedUserId) {
         const found = allUsers.find(u => u.id === savedUserId);
@@ -184,7 +286,7 @@ export function AppProvider({ children }) {
   // Create or Update User
   const saveUser = async (userData) => {
     const isNew = !userData.id;
-    const userId = userData.id || `user-${Date.now()}`;
+    const userId = userData.id || `usr-${Date.now()}`;
     const cleanUser = {
       ...userData,
       id: userId,
@@ -194,6 +296,47 @@ export function AppProvider({ children }) {
 
     await db.users.put(cleanUser);
     await syncEngine.queueChange('users', userId, isNew ? 'INSERT' : 'UPDATE', cleanUser);
+
+    // If role is DOCTOR, automatically upsert corresponding doctor in db.doctors
+    if (cleanUser.role === 'DOCTOR') {
+      const allDocs = await db.doctors.toArray();
+      const allBranches = await db.branches.toArray();
+      const existingDoc = allDocs.find(d => 
+        d.id === cleanUser.id || 
+        d.id === cleanUser.id.replace('usr-', 'doc-') ||
+        d.name?.toLowerCase().trim() === cleanUser.full_name?.toLowerCase().trim()
+      );
+
+      const targetBranchId = cleanUser.branch_id || 'branch-mnm';
+      const branchObj = allBranches.find(b => b.id === targetBranchId);
+      const branchPrefix = branchObj ? branchObj.name.replace('Al Rabeesh ', '').split(' ')[0] : 'Clinic';
+      const branchDocs = allDocs.filter(d => d.primary_branch_id === targetBranchId);
+      const chairIndex = branchDocs.length + 1;
+
+      const docData = {
+        id: existingDoc ? existingDoc.id : `doc-${cleanUser.username?.toLowerCase().replace(/[^a-z0-9]/g, '') || Date.now()}`,
+        name: cleanUser.full_name,
+        specialty: existingDoc?.specialty || userData.specialty || 'General Dental Surgeon',
+        qualification: existingDoc?.qualification || userData.qualification || 'BDS Dental Surgeon',
+        primary_branch_id: targetBranchId,
+        branches_assigned: [targetBranchId],
+        room_number: existingDoc?.room_number || `Room ${100 + chairIndex}`,
+        chair_number: existingDoc?.chair_number || `${branchPrefix} Chair ${chairIndex}`,
+        phone: cleanUser.phone || existingDoc?.phone || '',
+        email: cleanUser.email || existingDoc?.email || '',
+        photo_url: existingDoc?.photo_url || DOCTOR_AVATARS[branchDocs.length % DOCTOR_AVATARS.length],
+        color_tag: existingDoc?.color_tag || DOCTOR_COLORS[branchDocs.length % DOCTOR_COLORS.length],
+        start_time: existingDoc?.start_time || '09:00',
+        end_time: existingDoc?.end_time || '17:30',
+        slot_duration_mins: 30,
+        is_active: cleanUser.is_active !== false,
+        updated_at: new Date().toISOString()
+      };
+
+      await db.doctors.put(docData);
+      await syncEngine.queueChange('doctors', docData.id, existingDoc ? 'UPDATE' : 'INSERT', docData);
+    }
+
     await refreshUsers();
     showToast(`User account ${cleanUser.full_name} saved successfully`, 'success');
   };
@@ -477,8 +620,8 @@ export function AppProvider({ children }) {
         syncNow: (opts) => syncEngine.syncNow(opts),
         clearOutbox: () => syncEngine.clearOutbox(),
         testConnection: (url) => syncEngine.testConnection(url),
-        getPendingSyncItems: () => syncEngine.getPendingItems(),
         syncEngine,
+        reconcileDoctorAccounts,
         resetToFreshDemoData,
         toast,
         showToast,

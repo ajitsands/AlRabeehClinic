@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 
 export default function DoctorManagement() {
-  const { showToast, branches, activeBranchId } = useApp();
+  const { showToast, branches, activeBranchId, reconcileDoctorAccounts, refreshUsers } = useApp();
   const [doctors, setDoctors] = useState([]);
   const [filterBranch, setFilterBranch] = useState('ALL');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -49,13 +49,16 @@ export default function DoctorManagement() {
   const [formPhoto, setFormPhoto] = useState('');
 
   const loadDoctors = async () => {
+    if (reconcileDoctorAccounts) {
+      await reconcileDoctorAccounts();
+    }
     const list = await db.doctors.toArray();
     setDoctors(list);
   };
 
   useEffect(() => {
     loadDoctors();
-  }, []);
+  }, [activeBranchId]);
 
   const handleOpenModal = (doc = null) => {
     if (doc) {
@@ -124,23 +127,24 @@ export default function DoctorManagement() {
       return;
     }
 
+    const docId = editingDoctor ? editingDoctor.id : `doc-${Date.now()}`;
     const docData = {
-      id: editingDoctor ? editingDoctor.id : `doc-${Date.now()}`,
-      name: formName,
+      id: docId,
+      name: formName.trim(),
       specialty: formSpecialty,
       qualification: formQualification,
       primary_branch_id: formPrimaryBranchId || activeBranchId,
       branches_assigned: [formPrimaryBranchId || activeBranchId],
       room_number: formRoom,
       chair_number: formChair,
-      phone: formPhone,
-      email: formEmail,
+      phone: formPhone.trim(),
+      email: formEmail.trim(),
       color_tag: formColor,
       start_time: formStartTime,
       end_time: formEndTime,
       slot_duration_mins: 30,
       photo_url: formPhoto,
-      is_active: true,
+      is_active: editingDoctor?.is_active !== undefined ? editingDoctor.is_active : true,
       updated_at: new Date().toISOString()
     };
 
@@ -154,14 +158,55 @@ export default function DoctorManagement() {
       showToast('New Doctor added to clinic schedule', 'success');
     }
 
+    // Also sync matching user in db.users
+    const allUsers = await db.users.toArray();
+    const matchingUser = allUsers.find(u => 
+      u.id === docId || 
+      u.id === docId.replace('doc-', 'usr-') || 
+      u.full_name?.toLowerCase().trim() === formName.toLowerCase().trim()
+    );
+
+    const generatedUsername = (formName.replace(/^Dr\.?\s*/i, '').toLowerCase().replace(/[^a-z0-9]/g, '') || `doc_${Date.now()}`).slice(0, 20);
+
+    const userData = {
+      id: matchingUser ? matchingUser.id : `usr-${docId.replace('doc-', '')}`,
+      username: matchingUser?.username || generatedUsername,
+      full_name: formName.trim(),
+      role: 'DOCTOR',
+      branch_id: formPrimaryBranchId || activeBranchId,
+      phone: formPhone.trim() || matchingUser?.phone || '',
+      email: formEmail.trim() || matchingUser?.email || '',
+      is_active: docData.is_active,
+      updated_at: new Date().toISOString()
+    };
+
+    await db.users.put(userData);
+    await syncEngine.queueChange('users', userData.id, matchingUser ? 'UPDATE' : 'INSERT', userData);
+    if (refreshUsers) await refreshUsers();
+
     setIsModalOpen(false);
     loadDoctors();
   };
 
   const handleToggleStatus = async (doc) => {
-    const updated = { ...doc, is_active: !doc.is_active };
+    const updated = { ...doc, is_active: !doc.is_active, updated_at: new Date().toISOString() };
     await db.doctors.put(updated);
     await syncEngine.queueChange('doctors', doc.id, 'UPDATE', updated);
+    
+    // Also toggle matching user in db.users
+    const allUsers = await db.users.toArray();
+    const matchingUser = allUsers.find(u => 
+      u.id === doc.id || 
+      u.id === doc.id.replace('doc-', 'usr-') || 
+      u.full_name?.toLowerCase().trim() === doc.name.toLowerCase().trim()
+    );
+    if (matchingUser) {
+      const updatedUser = { ...matchingUser, is_active: updated.is_active, updated_at: new Date().toISOString() };
+      await db.users.put(updatedUser);
+      await syncEngine.queueChange('users', updatedUser.id, 'UPDATE', updatedUser);
+      if (refreshUsers) await refreshUsers();
+    }
+
     showToast(`Doctor ${doc.name} status updated`, 'info');
     loadDoctors();
   };
