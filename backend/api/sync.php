@@ -24,6 +24,63 @@ if (!$db) {
     exit();
 }
 
+// Auto-migrate schema updates if missing in MySQL (Self-Healing Migration)
+function ensureSchemaUpToDate($db) {
+    try {
+        // 1. Ensure `branches` table exists
+        $db->exec("CREATE TABLE IF NOT EXISTS `branches` (
+            `id` VARCHAR(50) PRIMARY KEY,
+            `name` VARCHAR(150) NOT NULL,
+            `code` VARCHAR(20) NOT NULL UNIQUE,
+            `prefix` VARCHAR(20) NOT NULL UNIQUE,
+            `address` TEXT NULL,
+            `phone` VARCHAR(30) NULL,
+            `color` VARCHAR(20) NOT NULL DEFAULT '#2563EB',
+            `is_active` TINYINT(1) NOT NULL DEFAULT 1,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB;");
+
+        // 2. Ensure `branch_id` exists in `users`
+        $cols = $db->query("SHOW COLUMNS FROM `users` LIKE 'branch_id'")->fetchAll();
+        if (empty($cols)) {
+            $db->exec("ALTER TABLE `users` ADD COLUMN `branch_id` VARCHAR(50) NULL AFTER `full_name`;");
+        }
+        
+        // 3. Ensure `role` ENUM supports SUPER_ADMIN and BRANCH_ADMIN
+        try {
+            $db->exec("ALTER TABLE `users` MODIFY COLUMN `role` ENUM('SUPER_ADMIN', 'BRANCH_ADMIN', 'DOCTOR', 'RECEPTIONIST', 'ADMIN', 'NURSE') NOT NULL DEFAULT 'RECEPTIONIST';");
+        } catch (Exception $e) {}
+
+        // 4. Ensure `branch_id` in `appointments`
+        $appCols = $db->query("SHOW COLUMNS FROM `appointments` LIKE 'branch_id'")->fetchAll();
+        if (empty($appCols)) {
+            $db->exec("ALTER TABLE `appointments` ADD COLUMN `branch_id` VARCHAR(50) NOT NULL DEFAULT 'branch-mnm' AFTER `id`;");
+        }
+
+        // 5. Ensure `home_branch_id` and `created_at_branch_id` in `patients`
+        $patCols1 = $db->query("SHOW COLUMNS FROM `patients` LIKE 'home_branch_id'")->fetchAll();
+        if (empty($patCols1)) {
+            $db->exec("ALTER TABLE `patients` ADD COLUMN `home_branch_id` VARCHAR(50) NOT NULL DEFAULT 'branch-mnm' AFTER `cpr_number`;");
+        }
+        $patCols2 = $db->query("SHOW COLUMNS FROM `patients` LIKE 'created_at_branch_id'")->fetchAll();
+        if (empty($patCols2)) {
+            $db->exec("ALTER TABLE `patients` ADD COLUMN `created_at_branch_id` VARCHAR(50) NOT NULL DEFAULT 'branch-mnm' AFTER `home_branch_id`;");
+        }
+
+        // 6. Ensure `primary_branch_id` in `doctors`
+        $docCols = $db->query("SHOW COLUMNS FROM `doctors` LIKE 'primary_branch_id'")->fetchAll();
+        if (empty($docCols)) {
+            $db->exec("ALTER TABLE `doctors` ADD COLUMN `primary_branch_id` VARCHAR(50) NOT NULL DEFAULT 'branch-mnm' AFTER `qualification`;");
+        }
+    } catch (Exception $e) {
+        // Silently continue if permissions or already modified
+    }
+}
+
+// Run self-healing schema check
+ensureSchemaUpToDate($db);
+
 $method = $_SERVER['REQUEST_METHOD'];
 $action = isset($_GET['action']) ? $_GET['action'] : 'status';
 
