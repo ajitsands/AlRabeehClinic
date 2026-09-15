@@ -126,11 +126,15 @@ function ensureSchemaUpToDate($db) {
             $db->exec("ALTER TABLE `doctors` MODIFY COLUMN `phone` VARCHAR(50) NULL;");
         } catch (Exception $e) {}
 
-        // 8. Ensure patient file_number, cpr_number, phone columns are wide enough
+        // 8. Ensure patient file_number, cpr_number, phone, cpr_expiry columns exist and are properly sized
         try {
             $db->exec("ALTER TABLE `patients` MODIFY COLUMN `file_number` VARCHAR(50) NOT NULL;");
             $db->exec("ALTER TABLE `patients` MODIFY COLUMN `cpr_number` VARCHAR(50) NULL;");
             $db->exec("ALTER TABLE `patients` MODIFY COLUMN `phone` VARCHAR(50) NOT NULL;");
+            $patExp = $db->query("SHOW COLUMNS FROM `patients` LIKE 'cpr_expiry'")->fetchAll();
+            if (empty($patExp)) {
+                $db->exec("ALTER TABLE `patients` ADD COLUMN `cpr_expiry` DATE NULL AFTER `cpr_number`;");
+            }
         } catch (Exception $e) {}
 
         // 9. Convert all tables and columns to utf8mb4 to support Arabic text and CPR Smart Card addresses

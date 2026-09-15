@@ -394,6 +394,22 @@ class SmartCardReaderService {
     const phone = misc.ContactNo || misc.MobileNumber || raw.TelephoneNumber || raw.MobileNumber || '';
     const email = misc.Email || raw.EmailAddress || '';
 
+    // Card Expiry Date format normalization
+    let rawExpiry = raw.CardexpiryDate || raw.CardExpiryDate || misc.CardExpiryDate || misc.ExpiryDate || raw.ExpiryDate || raw.CardExpiry || '';
+    let formattedExpiry = '';
+    if (rawExpiry) {
+      if (rawExpiry.includes('/')) {
+        const parts = rawExpiry.split('/');
+        if (parts.length === 3) {
+          formattedExpiry = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+        }
+      } else if (rawExpiry.length === 8 && !rawExpiry.includes('-')) {
+        formattedExpiry = `${rawExpiry.slice(0, 4)}-${rawExpiry.slice(4, 6)}-${rawExpiry.slice(6, 8)}`;
+      } else {
+        formattedExpiry = rawExpiry;
+      }
+    }
+
     // Photo Base64
     let photoBase64 = raw.PhotoB64Encoded || raw.Photo || raw.CardHolderPhoto || null;
     if (photoBase64 && !photoBase64.startsWith('data:image')) {
@@ -412,7 +428,8 @@ class SmartCardReaderService {
       email: email,
       address: address,
       passport_number: raw.PassportNumber || misc.PassportNo || '',
-      card_expiry: raw.CardexpiryDate || raw.CardExpiryDate || '',
+      card_expiry: formattedExpiry,
+      cpr_expiry: formattedExpiry,
       photo_base64: photoBase64,
       source: 'CARD_READER',
       read_timestamp: new Date().toISOString()
@@ -435,6 +452,7 @@ class SmartCardReaderService {
         address: 'Villa 52, Road 1402, Block 214, Muharraq',
         passport_number: 'BH8492019',
         card_expiry: '2029-08-14',
+        cpr_expiry: '2029-08-14',
         photo_base64: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200&auto=format&fit=crop&q=80',
         source: 'CARD_READER_SIMULATOR'
       },
@@ -451,12 +469,13 @@ class SmartCardReaderService {
         address: 'Apartment 4B, Tower 2, Seef District, Manama',
         passport_number: 'BH9182341',
         card_expiry: '2028-04-22',
+        cpr_expiry: '2028-04-22',
         photo_base64: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&auto=format&fit=crop&q=80',
         source: 'CARD_READER_SIMULATOR'
       },
       {
         cpr_number: '940608553',
-        full_name_en: 'Vikram Suresh Pillai',
+        full_name_en: 'Vikram Suresh Pillai (Expired CPR Card)',
         full_name_ar: 'فيكرام سوريش بيلاي',
         dob: '1994-06-08',
         gender: 'MALE',
@@ -466,7 +485,8 @@ class SmartCardReaderService {
         email: 'vikram.pillai@techsol.bh',
         address: 'Building 182, Flat 101, Road 2803, Adliya, Manama',
         passport_number: 'Z4928104',
-        card_expiry: '2027-06-08',
+        card_expiry: '2023-05-15',
+        cpr_expiry: '2023-05-15',
         photo_base64: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
         source: 'CARD_READER_SIMULATOR'
       },
@@ -483,6 +503,7 @@ class SmartCardReaderService {
         address: 'Khobar Plaza, Al Khobar, Saudi Arabia',
         passport_number: 'SA7728190',
         card_expiry: '2030-12-30',
+        cpr_expiry: '2030-12-30',
         photo_base64: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=200&auto=format&fit=crop&q=80',
         source: 'CARD_READER_SIMULATOR'
       }
