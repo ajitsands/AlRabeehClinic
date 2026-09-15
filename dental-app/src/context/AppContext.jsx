@@ -147,14 +147,17 @@ export function AppProvider({ children }) {
     });
 
     const unsubSyncStart = syncEngine.on('syncStart', () => setIsSyncing(true));
-    const unsubSyncSuccess = syncEngine.on('syncSuccess', ({ pendingCount }) => {
+    const unsubSyncSuccess = syncEngine.on('syncSuccess', ({ pendingCount, syncedCount, message }) => {
       setIsSyncing(false);
       setPendingSyncCount(pendingCount);
-      showToast('Database Synchronized with Server', 'success');
+      if (syncedCount > 0) {
+        showToast(message || `Synchronized ${syncedCount} records with cloud server`, 'success');
+      }
     });
-    const unsubSyncError = syncEngine.on('syncError', ({ pendingCount }) => {
+    const unsubSyncError = syncEngine.on('syncError', ({ error, pendingCount }) => {
       setIsSyncing(false);
       setPendingSyncCount(pendingCount);
+      showToast(`Sync notice: ${error}. ${pendingCount} records stored securely in local database.`, 'info');
     });
     const unsubOutbox = syncEngine.on('outboxUpdated', (count) => {
       setPendingSyncCount(count);
@@ -268,7 +271,11 @@ export function AppProvider({ children }) {
         isOnline,
         isSyncing,
         pendingSyncCount,
-        syncNow: () => syncEngine.syncNow(),
+        syncNow: (opts) => syncEngine.syncNow(opts),
+        clearOutbox: () => syncEngine.clearOutbox(),
+        testConnection: (url) => syncEngine.testConnection(url),
+        getPendingSyncItems: () => syncEngine.getPendingItems(),
+        syncEngine,
         toast,
         showToast,
         formatCurrency,

@@ -20,6 +20,8 @@ import {
   PlusCircle
 } from 'lucide-react';
 
+import SyncCenterModal from '../common/SyncCenterModal';
+
 export default function HorizontalNavbar({ onOpenNewPatient, onOpenNewAppointment }) {
   const { 
     activeTab, 
@@ -41,6 +43,7 @@ export default function HorizontalNavbar({ onOpenNewPatient, onOpenNewAppointmen
   const [isReadingCard, setIsReadingCard] = useState(false);
   const [showRoleMenu, setShowRoleMenu] = useState(false);
   const [showSimMenu, setShowSimMenu] = useState(false);
+  const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
 
   const navItems = [
     { id: 'appointments', label: 'Doctor Schedule & Calendar', icon: Calendar, badge: 'Live Grid' },
@@ -165,14 +168,13 @@ export default function HorizontalNavbar({ onOpenNewPatient, onOpenNewAppointmen
 
             {/* Offline / Online Sync Badge */}
             <button
-              onClick={syncNow}
-              disabled={isSyncing}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+              onClick={() => setIsSyncModalOpen(true)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all cursor-pointer ${
                 isOnline
-                  ? 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700'
-                  : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800'
+                  ? 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-750'
+                  : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800 hover:bg-amber-100'
               }`}
-              title={isOnline ? 'Connected to Cloud Server. Click to force sync.' : 'Offline Mode (Local SQLite/IndexedDB Active)'}
+              title="Click to open Live Sync Center & Queue Manager"
             >
               {isOnline ? (
                 <Wifi className="w-3.5 h-3.5 text-emerald-500" />
@@ -191,7 +193,7 @@ export default function HorizontalNavbar({ onOpenNewPatient, onOpenNewAppointmen
             {/* Theme Switcher */}
             <button
               onClick={() => toggleTheme()}
-              className="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition-all"
+              className="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition-all cursor-pointer"
               title={`Switch to ${theme === 'light' ? 'Dark' : 'Light'} Mode`}
             >
               {theme === 'light' ? (
@@ -205,7 +207,7 @@ export default function HorizontalNavbar({ onOpenNewPatient, onOpenNewAppointmen
             <div className="relative">
               <button
                 onClick={() => setShowRoleMenu(!showRoleMenu)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-semibold border border-slate-200 dark:border-slate-700"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-semibold border border-slate-200 dark:border-slate-700 cursor-pointer"
               >
                 {activeUserRole === 'ADMIN' && <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />}
                 {activeUserRole === 'DOCTOR' && <Stethoscope className="w-3.5 h-3.5 text-emerald-600" />}
@@ -220,7 +222,7 @@ export default function HorizontalNavbar({ onOpenNewPatient, onOpenNewAppointmen
                     <button
                       key={role}
                       onClick={() => { setActiveUserRole(role); setShowRoleMenu(false); }}
-                      className={`w-full text-left px-3 py-2 flex items-center justify-between hover:bg-slate-100 dark:hover:bg-slate-700 ${
+                      className={`w-full text-left px-3 py-2 flex items-center justify-between hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer ${
                         activeUserRole === role ? 'text-blue-600 dark:text-blue-400 font-bold' : 'text-slate-700 dark:text-slate-300'
                       }`}
                     >
@@ -246,7 +248,7 @@ export default function HorizontalNavbar({ onOpenNewPatient, onOpenNewAppointmen
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
-                className={`flex items-center gap-2.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-extrabold whitespace-nowrap transition-all duration-200 ${
+                className={`flex items-center gap-2.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-extrabold whitespace-nowrap transition-all duration-200 cursor-pointer ${
                   isActive
                     ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/25 border border-blue-500'
                     : 'text-slate-700 dark:text-slate-300 bg-white/70 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800/80 hover:bg-white dark:hover:bg-slate-850 hover:text-blue-600 dark:hover:text-blue-400 hover:border-slate-300 dark:hover:border-slate-700 shadow-2xs'
@@ -266,6 +268,12 @@ export default function HorizontalNavbar({ onOpenNewPatient, onOpenNewAppointmen
           })}
         </nav>
       </div>
+
+      {/* Sync Center & Queue Inspector Modal */}
+      <SyncCenterModal
+        isOpen={isSyncModalOpen}
+        onClose={() => setIsSyncModalOpen(false)}
+      />
     </header>
   );
 }

@@ -1,7 +1,17 @@
 <?php
-require_once __DIR__ . '/../config/database.php';
-
+// CORS Headers for multi-origin & local development support
+header("Access-Control-Allow-Origin: *");
+header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, Origin, Accept");
 header("Content-Type: application/json; charset=UTF-8");
+
+// Handle preflight OPTIONS request
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit();
+}
+
+require_once __DIR__ . '/../config/database.php';
 
 $database = new Database();
 $db = $database->getConnection();
@@ -143,6 +153,100 @@ if ($method === 'POST' && $action === 'push') {
                         ':file_path' => $payload['file_path'] ?? '',
                         ':file_data_base64' => $payload['file_data_base64'] ?? null,
                         ':notes' => $payload['notes'] ?? null
+                    ]);
+                }
+            } elseif ($entityType === 'doctors') {
+                if ($operation === 'INSERT' || $operation === 'UPDATE') {
+                    $stmt = $db->prepare("
+                        INSERT INTO doctors (id, name, specialty, qualification, room_number, chair_number, phone, email, photo_url, color_tag, start_time, end_time, slot_duration_mins, is_active, updated_at)
+                        VALUES (:id, :name, :specialty, :qualification, :room_number, :chair_number, :phone, :email, :photo_url, :color_tag, :start_time, :end_time, :slot_duration_mins, :is_active, NOW())
+                        ON DUPLICATE KEY UPDATE
+                            name = VALUES(name),
+                            specialty = VALUES(specialty),
+                            qualification = VALUES(qualification),
+                            room_number = VALUES(room_number),
+                            chair_number = VALUES(chair_number),
+                            phone = VALUES(phone),
+                            email = VALUES(email),
+                            photo_url = VALUES(photo_url),
+                            color_tag = VALUES(color_tag),
+                            start_time = VALUES(start_time),
+                            end_time = VALUES(end_time),
+                            slot_duration_mins = VALUES(slot_duration_mins),
+                            is_active = VALUES(is_active),
+                            updated_at = NOW()
+                    ");
+                    $stmt->execute([
+                        ':id' => $payload['id'],
+                        ':name' => $payload['name'],
+                        ':specialty' => $payload['specialty'] ?? 'General Dental Surgeon',
+                        ':qualification' => $payload['qualification'] ?? 'BDS',
+                        ':room_number' => $payload['room_number'] ?? 'Room 1',
+                        ':chair_number' => $payload['chair_number'] ?? 'Chair 1',
+                        ':phone' => $payload['phone'] ?? null,
+                        ':email' => $payload['email'] ?? null,
+                        ':photo_url' => $payload['photo_url'] ?? null,
+                        ':color_tag' => $payload['color_tag'] ?? '#3B82F6',
+                        ':start_time' => $payload['start_time'] ?? '09:00',
+                        ':end_time' => $payload['end_time'] ?? '17:00',
+                        ':slot_duration_mins' => $payload['slot_duration_mins'] ?? 30,
+                        ':is_active' => isset($payload['is_active']) ? ($payload['is_active'] ? 1 : 0) : 1
+                    ]);
+                }
+            } elseif ($entityType === 'services') {
+                if ($operation === 'INSERT' || $operation === 'UPDATE') {
+                    $stmt = $db->prepare("
+                        INSERT INTO dental_services (id, name, category, default_duration_mins, required_slots, price, description, is_active, updated_at)
+                        VALUES (:id, :name, :category, :default_duration_mins, :required_slots, :price, :description, :is_active, NOW())
+                        ON DUPLICATE KEY UPDATE
+                            name = VALUES(name),
+                            category = VALUES(category),
+                            default_duration_mins = VALUES(default_duration_mins),
+                            required_slots = VALUES(required_slots),
+                            price = VALUES(price),
+                            description = VALUES(description),
+                            is_active = VALUES(is_active),
+                            updated_at = NOW()
+                    ");
+                    $stmt->execute([
+                        ':id' => $payload['id'],
+                        ':name' => $payload['name'],
+                        ':category' => $payload['category'] ?? 'General',
+                        ':default_duration_mins' => $payload['default_duration_mins'] ?? 30,
+                        ':required_slots' => $payload['required_slots'] ?? 1,
+                        ':price' => $payload['price'] ?? 0.000,
+                        ':description' => $payload['description'] ?? null,
+                        ':is_active' => isset($payload['is_active']) ? ($payload['is_active'] ? 1 : 0) : 1
+                    ]);
+                }
+            } elseif ($entityType === 'settings') {
+                if ($operation === 'INSERT' || $operation === 'UPDATE') {
+                    $stmt = $db->prepare("
+                        INSERT INTO system_settings (id, clinic_name, theme, timezone, date_format, currency_code, currency_symbol, currency_decimals, reader_ws_url, reader_rest_url, updated_at)
+                        VALUES (:id, :clinic_name, :theme, :timezone, :date_format, :currency_code, :currency_symbol, :currency_decimals, :reader_ws_url, :reader_rest_url, NOW())
+                        ON DUPLICATE KEY UPDATE
+                            clinic_name = VALUES(clinic_name),
+                            theme = VALUES(theme),
+                            timezone = VALUES(timezone),
+                            date_format = VALUES(date_format),
+                            currency_code = VALUES(currency_code),
+                            currency_symbol = VALUES(currency_symbol),
+                            currency_decimals = VALUES(currency_decimals),
+                            reader_ws_url = VALUES(reader_ws_url),
+                            reader_rest_url = VALUES(reader_rest_url),
+                            updated_at = NOW()
+                    ");
+                    $stmt->execute([
+                        ':id' => $payload['id'] ?? 'clinic_settings',
+                        ':clinic_name' => $payload['clinic_name'] ?? 'Al Rabeesh Dental Specialty Center',
+                        ':theme' => $payload['theme'] ?? 'light',
+                        ':timezone' => $payload['timezone'] ?? 'Asia/Bahrain',
+                        ':date_format' => $payload['date_format'] ?? 'DD/MM/YYYY',
+                        ':currency_code' => $payload['currency_code'] ?? 'BHD',
+                        ':currency_symbol' => $payload['currency_symbol'] ?? 'BD',
+                        ':currency_decimals' => $payload['currency_decimals'] ?? 3,
+                        ':reader_ws_url' => $payload['reader_ws_url'] ?? 'ws://localhost:5060/SCardRead',
+                        ':reader_rest_url' => $payload['reader_rest_url'] ?? 'http://localhost:5050/api/operation/ReadCard'
                     ]);
                 }
             }
