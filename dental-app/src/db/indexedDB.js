@@ -909,6 +909,7 @@ export async function seedFreshMultiBranchData() {
     id: 'clinic_settings',
     clinic_name: 'Al Rabeesh Dental Specialty Center',
     clinic_tagline: 'Excellence in Multi-Branch Dental Care & Aesthetic Dentistry',
+    clinic_logo_url: '/logo.png',
     default_branch_id: 'branch-mnm',
     theme: 'light',
     timezone: 'Asia/Bahrain',

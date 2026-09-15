@@ -118,8 +118,17 @@ export default function HorizontalNavbar({ onOpenNewPatient, onOpenNewAppointmen
           
           {/* Clinic Brand, Logo & Branch Switcher */}
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-teal-400 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
-              <Sparkles className="w-6 h-6" />
+            <div className="h-10 px-2 py-1 bg-white dark:bg-slate-850 rounded-xl border border-slate-250 dark:border-slate-700/80 shadow-xs flex items-center justify-center shrink-0">
+              <img 
+                src={settings.clinic_logo_url || '/logo.png'} 
+                alt={settings.clinic_name || 'Al Rabeesh Dental'}
+                className="h-8 max-h-8 w-auto max-w-[140px] object-contain"
+                onError={(e) => {
+                  if (e.currentTarget.src !== window.location.origin + '/logo.png' && !e.currentTarget.src.endsWith('/logo.png')) {
+                    e.currentTarget.src = '/logo.png';
+                  }
+                }}
+              />
             </div>
             <div>
               <div className="flex items-center gap-2">

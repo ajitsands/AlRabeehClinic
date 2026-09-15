@@ -88,6 +88,7 @@ export function AppProvider({ children }) {
   const [settings, setSettings] = useState({
     clinic_name: 'Al Rabeesh Dental Specialty Center',
     clinic_tagline: 'Excellence in Dental Care & Aesthetic Dentistry',
+    clinic_logo_url: '/logo.png',
     default_branch_id: 'branch-mnm',
     theme: 'light',
     timezone: 'Asia/Bahrain',

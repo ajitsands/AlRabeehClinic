@@ -25,7 +25,15 @@ import {
   Sliders,
   Users,
   Building2,
-  Calendar
+  Calendar,
+  Image as ImageIcon,
+  UploadCloud,
+  RotateCcw,
+  Trash2,
+  Sparkles,
+  ExternalLink,
+  FileImage,
+  CheckCircle2
 } from 'lucide-react';
 
 const REGIONAL_PRESETS = [
@@ -111,8 +119,74 @@ export default function SettingsView() {
 
   const [clinicName, setClinicName] = useState(settings.clinic_name);
   const [clinicTagline, setClinicTagline] = useState(settings.clinic_tagline);
+  const [clinicLogoUrl, setClinicLogoUrl] = useState(settings.clinic_logo_url || '/logo.png');
+  const [logoInputMode, setLogoInputMode] = useState('upload'); // 'upload' | 'url'
+  const [customLogoUrlInput, setCustomLogoUrlInput] = useState('');
+  const [uploadError, setUploadError] = useState('');
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [clinicPhone, setClinicPhone] = useState(settings.clinic_phone || '');
   const [clinicAddress, setClinicAddress] = useState(settings.clinic_address || '');
+
+  // Keep logo in sync with settings
+  useEffect(() => {
+    if (settings.clinic_logo_url !== undefined) {
+      setClinicLogoUrl(settings.clinic_logo_url || '/logo.png');
+    }
+  }, [settings.clinic_logo_url]);
+
+  const handleLogoFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.match(/^image\/(png|jpeg|jpg|webp|svg\+xml)$/)) {
+      setUploadError('Please select a valid image file (PNG, JPG, SVG, WebP)');
+      showToast('Invalid file format. Please upload PNG, JPG, SVG or WebP', 'error');
+      return;
+    }
+
+    if (file.size > 2.5 * 1024 * 1024) {
+      setUploadError('Image file size is too large (max 2.5 MB). Please choose a smaller image.');
+      showToast('Image size exceeds 2.5MB limit', 'warning');
+      return;
+    }
+
+    setUploadError('');
+    setIsUploadingLogo(true);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64Data = event.target.result;
+      setClinicLogoUrl(base64Data);
+      setIsUploadingLogo(false);
+      showToast('Logo loaded for preview. Click "Save Profile Settings" to apply.', 'success');
+    };
+    reader.onerror = () => {
+      setIsUploadingLogo(false);
+      setUploadError('Failed to read image file');
+      showToast('Error reading uploaded image', 'error');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleApplyLogoUrl = () => {
+    if (!customLogoUrlInput.trim()) return;
+    setClinicLogoUrl(customLogoUrlInput.trim());
+    setUploadError('');
+    showToast('Image URL applied to preview. Click "Save Profile Settings" to confirm.', 'info');
+  };
+
+  const handleResetToDefaultLogo = () => {
+    setClinicLogoUrl('/logo.png');
+    setCustomLogoUrlInput('');
+    setUploadError('');
+    showToast('Reset to default Al Rabeesh logo', 'info');
+  };
+
+  const handleRemoveLogo = () => {
+    setClinicLogoUrl('');
+    setCustomLogoUrlInput('');
+    setUploadError('');
+    showToast('Logo removed', 'info');
+  };
 
   // Operating Hours & Break Schedule State
   const [clinicOpenTime, setClinicOpenTime] = useState(settings.clinic_open_time || '09:00');
@@ -179,6 +253,7 @@ export default function SettingsView() {
     await updateSettings({
       clinic_name: clinicName,
       clinic_tagline: clinicTagline,
+      clinic_logo_url: clinicLogoUrl,
       clinic_phone: clinicPhone,
       clinic_address: clinicAddress,
       clinic_open_time: clinicOpenTime,
@@ -302,6 +377,248 @@ export default function SettingsView() {
         {/* 2. SUB-TAB: CLINIC PROFILE & THEME */}
         {subTab === 'profile' && (
           <form onSubmit={handleSaveAll} className="space-y-4">
+            
+            {/* Master Clinic Logo & Branding Card */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                    <ImageIcon className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                      <span>Clinic Brand Logo & Emblem</span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                        Live Sync
+                      </span>
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Upload your clinic logo to appear on the top navigation bar, patient records, and printed prescriptions
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleResetToDefaultLogo}
+                    className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                    title="Restore default Al Rabeesh logo"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Reset Default Logo</span>
+                  </button>
+                  {clinicLogoUrl && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveLogo}
+                      className="px-3 py-1.5 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Remove</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Logo Grid: Previews on Left, Uploader on Right */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                
+                {/* Left: Dual Theme Live Previews */}
+                <div className="lg:col-span-6 space-y-3">
+                  <span className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Live Appearance Preview
+                  </span>
+
+                  {/* 1. Light Mode Preview */}
+                  <div className="p-3.5 rounded-xl bg-white border border-slate-250 shadow-xs space-y-2">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-500">
+                      <span className="flex items-center gap-1">
+                        <Sun className="w-3.5 h-3.5 text-amber-500" /> Light Navbar Header
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-normal">Day Mode</span>
+                    </div>
+                    <div className="flex items-center gap-3 p-2 bg-slate-50/80 rounded-lg border border-slate-150">
+                      {clinicLogoUrl ? (
+                        <div className="h-10 px-2.5 py-1 bg-white rounded-lg border border-slate-200 shadow-2xs flex items-center justify-center">
+                          <img 
+                            src={clinicLogoUrl} 
+                            alt="Clinic Logo Preview" 
+                            className="h-8 max-h-8 w-auto max-w-[130px] object-contain"
+                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-10 h-10 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-xs">
+                          <Sparkles className="w-5 h-5" />
+                        </div>
+                      )}
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-extrabold text-sm tracking-tight text-slate-900">
+                            {clinicName ? clinicName.toUpperCase() : 'AL RABEEH'}
+                          </span>
+                          <span className="px-1.5 py-0.2 text-[9px] font-bold uppercase bg-blue-100 text-blue-700 rounded-full">
+                            Dental Center
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 truncate max-w-[240px]">
+                          {clinicTagline || 'Bahrain & GCC Smart Card Integrated System'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 2. Dark Mode Preview */}
+                  <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 shadow-xs space-y-2">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-400">
+                      <span className="flex items-center gap-1">
+                        <Moon className="w-3.5 h-3.5 text-indigo-400" /> Dark Navbar Header
+                      </span>
+                      <span className="text-[10px] text-slate-500 font-normal">Operatory Night Mode</span>
+                    </div>
+                    <div className="flex items-center gap-3 p-2 bg-slate-800/80 rounded-lg border border-slate-700/60">
+                      {clinicLogoUrl ? (
+                        <div className="h-10 px-2.5 py-1 bg-slate-850 rounded-lg border border-slate-700 shadow-2xs flex items-center justify-center">
+                          <img 
+                            src={clinicLogoUrl} 
+                            alt="Clinic Logo Preview" 
+                            className="h-8 max-h-8 w-auto max-w-[130px] object-contain"
+                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-10 h-10 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-xs">
+                          <Sparkles className="w-5 h-5" />
+                        </div>
+                      )}
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-extrabold text-sm tracking-tight text-white">
+                            {clinicName ? clinicName.toUpperCase() : 'AL RABEEH'}
+                          </span>
+                          <span className="px-1.5 py-0.2 text-[9px] font-bold uppercase bg-blue-900/60 text-blue-300 rounded-full border border-blue-800">
+                            Dental Center
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 truncate max-w-[240px]">
+                          {clinicTagline || 'Bahrain & GCC Smart Card Integrated System'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right: Upload & URL Configuration */}
+                <div className="lg:col-span-6 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Change Logo Image
+                    </span>
+
+                    {/* Mode Toggle */}
+                    <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg text-xs font-bold">
+                      <button
+                        type="button"
+                        onClick={() => setLogoInputMode('upload')}
+                        className={`px-2.5 py-1 rounded-md transition ${
+                          logoInputMode === 'upload' 
+                            ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-2xs' 
+                            : 'text-slate-600 dark:text-slate-400'
+                        }`}
+                      >
+                        Upload File
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setLogoInputMode('url')}
+                        className={`px-2.5 py-1 rounded-md transition ${
+                          logoInputMode === 'url' 
+                            ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-2xs' 
+                            : 'text-slate-600 dark:text-slate-400'
+                        }`}
+                      >
+                        Image URL
+                      </button>
+                    </div>
+                  </div>
+
+                  {uploadError && (
+                    <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 shrink-0" />
+                      <span>{uploadError}</span>
+                    </div>
+                  )}
+
+                  {logoInputMode === 'upload' ? (
+                    <div>
+                      <label 
+                        htmlFor="clinic-logo-file-input"
+                        className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-blue-250 dark:border-blue-800/80 hover:border-blue-500 dark:hover:border-blue-500 bg-blue-50/40 dark:bg-blue-950/20 hover:bg-blue-50/80 dark:hover:bg-blue-950/40 rounded-2xl cursor-pointer transition text-center group"
+                      >
+                        <div className="w-12 h-12 rounded-2xl bg-blue-100 dark:bg-blue-900/60 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-2.5 group-hover:scale-110 transition-transform">
+                          <UploadCloud className="w-6 h-6" />
+                        </div>
+                        <span className="text-xs font-bold text-slate-900 dark:text-white">
+                          {isUploadingLogo ? 'Processing image...' : 'Click to browse or drop clinic logo here'}
+                        </span>
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                          Supported formats: PNG, SVG, JPG, WebP (Max 2.5MB)
+                        </span>
+                        <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold mt-2 px-2 py-0.5 rounded-full bg-blue-100/60 dark:bg-blue-900/40">
+                          Recommended size: 240×60px transparent PNG
+                        </span>
+                      </label>
+                      <input
+                        id="clinic-logo-file-input"
+                        type="file"
+                        accept="image/png, image/jpeg, image/jpg, image/webp, image/svg+xml"
+                        onChange={handleLogoFileUpload}
+                        className="hidden"
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-2 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-750 text-xs">
+                      <label className="block font-bold uppercase text-slate-600 dark:text-slate-300">
+                        External Logo URL
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="url"
+                          placeholder="https://example.com/logo.png or /logo.png"
+                          value={customLogoUrlInput}
+                          onChange={(e) => setCustomLogoUrlInput(e.target.value)}
+                          className="flex-1 px-3 py-2 bg-white dark:bg-slate-900 border rounded-xl font-mono text-xs text-slate-900 dark:text-white"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleApplyLogoUrl}
+                          className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs shadow-xs transition cursor-pointer"
+                        >
+                          Apply URL
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-slate-500">
+                        Enter a direct link to any hosted clinic logo image (e.g. from your web server or CDN).
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Logo Source / Status indicator */}
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400">
+                    <span className="flex items-center gap-1.5 font-medium">
+                      <FileImage className="w-3.5 h-3.5 text-blue-500" />
+                      <span>Current Logo Source:</span>
+                    </span>
+                    <span className="font-bold text-slate-900 dark:text-slate-200 truncate max-w-[200px]">
+                      {clinicLogoUrl ? (clinicLogoUrl.startsWith('data:') ? 'Custom Upload (Base64)' : clinicLogoUrl) : 'No Logo Set'}
+                    </span>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               
               {/* Clinic Identity Profile */}
@@ -406,9 +723,10 @@ export default function SettingsView() {
 
                 <button
                   type="submit"
-                  className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-500/20 transition cursor-pointer"
+                  className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-500/20 transition cursor-pointer flex items-center justify-center gap-2"
                 >
-                  Save Profile Settings
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Save Profile & Branding Settings</span>
                 </button>
               </div>
 
