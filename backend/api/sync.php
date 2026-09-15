@@ -5,6 +5,20 @@
 @ini_set('memory_limit', '512M');
 @ini_set('max_execution_time', '300');
 @ini_set('max_input_time', '300');
+@ini_set('display_errors', '0');
+error_reporting(0);
+
+// PHP 7.x Polyfills for backward compatibility with PHP 7.4 servers
+if (!function_exists('str_starts_with')) {
+    function str_starts_with($haystack, $needle) {
+        return (string)$needle !== '' && strncmp($haystack, $needle, strlen($needle)) === 0;
+    }
+}
+if (!function_exists('str_contains')) {
+    function str_contains($haystack, $needle) {
+        return $needle !== '' && mb_strpos($haystack, $needle) !== false;
+    }
+}
 
 // CORS Headers for multi-origin & local development support
 header("Access-Control-Allow-Origin: *");
@@ -446,7 +460,7 @@ if ($method === 'POST' && $action === 'push') {
                 if (isset($logPayload['file_data_base64']) && strlen($logPayload['file_data_base64']) > 500) {
                     $logPayload['file_data_base64'] = '[BASE64_DATA_' . strlen($logPayload['file_data_base64']) . '_BYTES]';
                 }
-                if (isset($logPayload['photo_url']) && strlen($logPayload['photo_url']) > 500 && str_starts_with($logPayload['photo_url'], 'data:')) {
+                if (isset($logPayload['photo_url']) && strlen($logPayload['photo_url']) > 500 && (strpos($logPayload['photo_url'], 'data:') === 0)) {
                     $logPayload['photo_url'] = '[BASE64_PHOTO_' . strlen($logPayload['photo_url']) . '_BYTES]';
                 }
 

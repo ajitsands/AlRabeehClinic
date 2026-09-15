@@ -294,8 +294,19 @@ class SyncEngine {
             throw new Error(`Server returned HTTP ${response.status} (${response.statusText || 'Endpoint Error'})`);
           }
 
-          const resJson = await response.json();
-          if (resJson.success) {
+          let resJson = null;
+          const rawText = await response.text();
+          try {
+            resJson = JSON.parse(rawText);
+          } catch (jsonErr) {
+            console.warn('Non-JSON response received:', rawText.substring(0, 300));
+            const match = rawText.match(/<b>(?:Fatal error|Warning|Notice)<\/b>:(.*?)(?:<br|\n|$)/i);
+            const cleanErr = match ? match[1].replace(/<[^>]*>?/gm, '').trim() : `Server returned non-JSON format (HTTP ${response.status})`;
+            errors.push(cleanErr);
+            continue;
+          }
+
+          if (resJson && resJson.success) {
             const syncedIds = resJson.results?.syncedIds || [];
             for (const item of batch) {
               if (syncedIds.includes(item.id)) {
@@ -306,7 +317,7 @@ class SyncEngine {
             if (resJson.results?.errors?.length > 0) {
               errors.push(...resJson.results.errors.map(e => e.message || 'Record sync error'));
             }
-          } else {
+          } else if (resJson) {
             errors.push(resJson.message || 'Server rejected sync batch');
           }
         } catch (batchErr) {
