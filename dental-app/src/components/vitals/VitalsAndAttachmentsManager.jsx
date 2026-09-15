@@ -38,7 +38,13 @@ import {
   Minimize2,
   Contrast,
   RefreshCw,
-  Move
+  Move,
+  ExternalLink,
+  Copy,
+  Check,
+  Table,
+  FileSpreadsheet,
+  FileCode
 } from 'lucide-react';
 
 export default function VitalsAndAttachmentsManager({ activePatientId, onBackToList }) {
@@ -180,7 +186,7 @@ export default function VitalsAndAttachmentsManager({ activePatientId, onBackToL
   const [fileBase64, setFileBase64] = useState('');
   const [previewAttachment, setPreviewAttachment] = useState(null);
 
-  // Diagnostic Image Viewer & Zoom Controls State
+  // Multi-Format Attachment Viewer State (Images, PDF, Word, Excel, Text)
   const [zoomScale, setZoomScale] = useState(1);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -188,15 +194,104 @@ export default function VitalsAndAttachmentsManager({ activePatientId, onBackToL
   const [rotationAngle, setRotationAngle] = useState(0);
   const [isInverted, setIsInverted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [blobUrl, setBlobUrl] = useState(null);
+  const [textContent, setTextContent] = useState('');
+  const [csvRows, setCsvRows] = useState([]);
+  const [copiedText, setCopiedText] = useState(false);
 
-  // Reset viewer parameters on opening a new attachment or closing preview
+  // Helper to categorize attachment file formats
+  const getAttachmentType = (att) => {
+    if (!att) return 'unknown';
+    const mime = (att.mime_type || '').toLowerCase();
+    const name = (att.original_name || att.file_name || '').toLowerCase();
+
+    if (mime.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|svg|bmp|tiff)$/i.test(name)) {
+      return 'image';
+    }
+    if (mime === 'application/pdf' || name.endsWith('.pdf')) {
+      return 'pdf';
+    }
+    if (
+      mime.includes('word') || 
+      mime.includes('officedocument.wordprocessingml') || 
+      /\.(doc|docx|rtf|odt)$/i.test(name)
+    ) {
+      return 'word';
+    }
+    if (
+      mime.includes('excel') || 
+      mime.includes('spreadsheet') || 
+      mime.includes('csv') || 
+      /\.(xls|xlsx|csv|tsv|ods)$/i.test(name)
+    ) {
+      return 'excel';
+    }
+    if (
+      mime.startsWith('text/') || 
+      /\.(txt|json|xml|log|md|html)$/i.test(name)
+    ) {
+      return 'text';
+    }
+    return 'other';
+  };
+
+  // Convert Base64 to Blob URL and extract text/CSV content
   useEffect(() => {
-    if (previewAttachment) {
-      setZoomScale(1);
-      setPanOffset({ x: 0, y: 0 });
-      setRotationAngle(0);
-      setIsInverted(false);
-      setIsFullscreen(false);
+    if (!previewAttachment || !previewAttachment.file_data_base64) {
+      setBlobUrl(null);
+      setTextContent('');
+      setCsvRows([]);
+      setCopiedText(false);
+      return;
+    }
+
+    setZoomScale(1);
+    setPanOffset({ x: 0, y: 0 });
+    setRotationAngle(0);
+    setIsInverted(false);
+    setIsFullscreen(false);
+    setCopiedText(false);
+
+    const type = getAttachmentType(previewAttachment);
+
+    try {
+      const dataUri = previewAttachment.file_data_base64;
+      const parts = dataUri.split(',');
+      const base64Data = parts[1] || parts[0];
+      const byteCharacters = atob(base64Data);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const mimeMatch = dataUri.match(/data:([^;]+);base64/);
+      const computedMime = previewAttachment.mime_type || (mimeMatch ? mimeMatch[1] : 'application/octet-stream');
+
+      const blob = new Blob([byteArray], { type: computedMime });
+      const createdUrl = URL.createObjectURL(blob);
+      setBlobUrl(createdUrl);
+
+      // Parse text or CSV content for in-app viewing
+      if (type === 'text' || type === 'excel' && (previewAttachment.original_name || '').endsWith('.csv')) {
+        const textDecoder = new TextDecoder('utf-8');
+        const decodedText = textDecoder.decode(byteArray);
+        setTextContent(decodedText);
+
+        if ((previewAttachment.original_name || '').toLowerCase().endsWith('.csv') || computedMime.includes('csv')) {
+          const lines = decodedText.split(/\r?\n/).filter(line => line.trim().length > 0);
+          const parsedGrid = lines.map(line => {
+            const cells = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+            return cells.map(c => c.replace(/^"|"$/g, '').trim());
+          });
+          setCsvRows(parsedGrid);
+        }
+      }
+
+      return () => {
+        URL.revokeObjectURL(createdUrl);
+      };
+    } catch (err) {
+      console.warn('Could not generate blob URL for preview:', err);
     }
   }, [previewAttachment]);
 
@@ -220,7 +315,7 @@ export default function VitalsAndAttachmentsManager({ activePatientId, onBackToL
   };
 
   const handleWheelZoom = (e) => {
-    if (!previewAttachment || !previewAttachment.mime_type?.startsWith('image/')) return;
+    if (!previewAttachment || getAttachmentType(previewAttachment) !== 'image') return;
     e.preventDefault();
     e.stopPropagation();
     const delta = e.deltaY < 0 ? 0.2 : -0.2;
@@ -254,6 +349,15 @@ export default function VitalsAndAttachmentsManager({ activePatientId, onBackToL
       setPanOffset({ x: 0, y: 0 });
     } else {
       setZoomScale(2.5);
+    }
+  };
+
+  const handleCopyTextContent = () => {
+    if (textContent) {
+      navigator.clipboard.writeText(textContent);
+      setCopiedText(true);
+      showToast('Document text copied to clipboard', 'info');
+      setTimeout(() => setCopiedText(false), 2000);
     }
   };
 
@@ -1124,272 +1228,457 @@ export default function VitalsAndAttachmentsManager({ activePatientId, onBackToL
         </div>
       )}
 
-      {/* FULL PREVIEW MODAL WITH INTERACTIVE X-RAY & IMAGE ZOOMING SUITE */}
-      {previewAttachment && (
-        <div className={`fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-2 sm:p-4 overflow-hidden ${isFullscreen ? 'p-0' : ''}`}>
-          <div className={`bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col transition-all duration-200 ${
-            isFullscreen 
-              ? 'w-screen h-screen rounded-none p-3 sm:p-4' 
-              : 'rounded-3xl max-w-6xl w-full p-4 sm:p-6 max-h-[96vh]'
-          }`}>
-            
-            {/* Header & Diagnostic Toolbar */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
-              <div className="min-w-0 flex items-center gap-2.5">
-                <span className={`px-2.5 py-1 text-[10px] font-black uppercase rounded-lg shrink-0 ${
-                  previewAttachment.category.includes('XRAY')
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300'
-                }`}>
-                  {previewAttachment.category}
-                </span>
-                <div className="min-w-0">
-                  <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-white truncate">
-                    {previewAttachment.file_name}
-                  </h3>
-                  {previewAttachment.notes && (
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-md">
-                      {previewAttachment.notes}
-                    </p>
-                  )}
-                </div>
-              </div>
+      {/* FULL PREVIEW MODAL WITH INTERACTIVE MULTI-FORMAT VIEWER (IMAGES, PDF, WORD, EXCEL, TEXT) */}
+      {previewAttachment && (() => {
+        const fileType = getAttachmentType(previewAttachment);
 
-              {/* Action & Zoom Controls */}
-              <div className="flex items-center flex-wrap gap-1.5 sm:gap-2">
-                {previewAttachment.mime_type?.startsWith('image/') && (
-                  <>
-                    {/* Zoom In & Out Controls */}
-                    <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-0.5 border border-slate-200 dark:border-slate-700">
-                      <button
-                        type="button"
-                        onClick={handleZoomOut}
-                        className="p-1.5 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg transition disabled:opacity-40"
-                        disabled={zoomScale <= 0.5}
-                        title="Zoom Out (-25%)"
-                      >
-                        <ZoomOut className="w-4 h-4" />
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleResetZoom}
-                        className="px-2 py-1 text-xs font-black text-slate-800 dark:text-white hover:text-blue-600 min-w-[50px] text-center"
-                        title="Click to reset zoom to 100%"
-                      >
-                        {Math.round(zoomScale * 100)}%
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleZoomIn}
-                        className="p-1.5 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg transition disabled:opacity-40"
-                        disabled={zoomScale >= 5}
-                        title="Zoom In (+25%)"
-                      >
-                        <ZoomIn className="w-4 h-4" />
-                      </button>
-                    </div>
-
-                    {/* Rotate */}
-                    <button
-                      type="button"
-                      onClick={handleRotate}
-                      className="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl border border-slate-200 dark:border-slate-700 transition"
-                      title="Rotate 90° Clockwise"
-                    >
-                      <RotateCw className="w-4 h-4" />
-                    </button>
-
-                    {/* X-Ray Negative / Contrast Inversion */}
-                    <button
-                      type="button"
-                      onClick={() => setIsInverted((prev) => !prev)}
-                      className={`p-2 rounded-xl border transition flex items-center gap-1 text-xs font-semibold ${
-                        isInverted
-                          ? 'bg-amber-500 text-white border-amber-600 shadow-xs'
-                          : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700'
-                      }`}
-                      title="Toggle X-Ray Invert / High-Contrast Mode"
-                    >
-                      <Contrast className="w-4 h-4" />
-                      <span className="hidden sm:inline text-[11px]">X-Ray Invert</span>
-                    </button>
-
-                    {/* Reset All Adjustments */}
-                    {(zoomScale !== 1 || panOffset.x !== 0 || panOffset.y !== 0 || rotationAngle !== 0 || isInverted) && (
-                      <button
-                        type="button"
-                        onClick={handleResetZoom}
-                        className="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl border border-slate-200 dark:border-slate-700 transition"
-                        title="Reset Zoom, Position, and Rotation"
-                      >
-                        <RefreshCw className="w-4 h-4" />
-                      </button>
+        return (
+          <div className={`fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-2 sm:p-4 overflow-hidden ${isFullscreen ? 'p-0' : ''}`}>
+            <div className={`bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col transition-all duration-200 ${
+              isFullscreen 
+                ? 'w-screen h-screen rounded-none p-3 sm:p-4' 
+                : 'rounded-3xl max-w-6xl w-full p-4 sm:p-6 max-h-[96vh]'
+            }`}>
+              
+              {/* Header & Format-Specific Toolbar */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+                <div className="min-w-0 flex items-center gap-2.5">
+                  <span className={`px-2.5 py-1 text-[10px] font-black uppercase rounded-lg shrink-0 ${
+                    fileType === 'image'
+                      ? 'bg-blue-600 text-white'
+                      : fileType === 'pdf'
+                      ? 'bg-rose-600 text-white'
+                      : fileType === 'excel'
+                      ? 'bg-emerald-600 text-white'
+                      : fileType === 'word'
+                      ? 'bg-blue-700 text-white'
+                      : 'bg-indigo-600 text-white'
+                  }`}>
+                    {fileType === 'image' ? previewAttachment.category : fileType.toUpperCase()}
+                  </span>
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-white truncate">
+                      {previewAttachment.file_name}
+                    </h3>
+                    {previewAttachment.notes && (
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-md">
+                        {previewAttachment.notes}
+                      </p>
                     )}
-
-                    {/* Fullscreen Toggle */}
-                    <button
-                      type="button"
-                      onClick={() => setIsFullscreen((prev) => !prev)}
-                      className="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl border border-slate-200 dark:border-slate-700 transition"
-                      title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen Examination'}
-                    >
-                      {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-                    </button>
-                  </>
-                )}
-
-                {/* Close Button */}
-                <button
-                  type="button"
-                  onClick={() => setPreviewAttachment(null)}
-                  className="p-2 text-slate-400 hover:text-rose-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition"
-                  title="Close Viewer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Interactive Image / X-Ray Canvas Area */}
-            <div 
-              className={`relative my-3 flex-1 overflow-hidden flex items-center justify-center bg-slate-950 rounded-2xl select-none transition-all ${
-                isFullscreen ? 'h-[calc(100vh-140px)]' : 'h-[60vh] min-h-[350px]'
-              } ${
-                zoomScale > 1 
-                  ? isDragging 
-                    ? 'cursor-grabbing' 
-                    : 'cursor-grab' 
-                  : 'cursor-zoom-in'
-              }`}
-              onWheel={handleWheelZoom}
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
-              onMouseLeave={handleMouseUp}
-              onDoubleClick={handleDoubleClick}
-            >
-              {previewAttachment.file_data_base64 && previewAttachment.mime_type?.startsWith('image/') ? (
-                <div className="w-full h-full flex items-center justify-center overflow-hidden">
-                  <img
-                    src={previewAttachment.file_data_base64}
-                    alt={previewAttachment.file_name}
-                    draggable={false}
-                    style={{
-                      transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomScale}) rotate(${rotationAngle}deg)`,
-                      filter: isInverted ? 'invert(1) hue-rotate(180deg) contrast(130%)' : 'none',
-                      transition: isDragging ? 'none' : 'transform 0.12s ease-out',
-                      maxHeight: '100%',
-                      maxWidth: '100%',
-                      objectFit: 'contain',
-                      userSelect: 'none'
-                    }}
-                    className="pointer-events-none drop-shadow-2xl"
-                  />
-                </div>
-              ) : (
-                <div className="text-center text-slate-400 py-16">
-                  <FileText className="w-16 h-16 mx-auto mb-3 text-indigo-400" />
-                  <p className="font-bold text-slate-200">{previewAttachment.original_name}</p>
-                  <p className="text-xs text-slate-500 mt-1">Non-image attachment. Download below to view in standard viewer.</p>
-                </div>
-              )}
-
-              {/* Overlay Quick Zoom Presets Bar */}
-              {previewAttachment.mime_type?.startsWith('image/') && (
-                <div className="absolute bottom-3 inset-x-0 flex justify-center items-center pointer-events-none px-4">
-                  <div className="flex items-center gap-1.5 bg-slate-900/85 backdrop-blur-md border border-slate-700/80 px-3 py-1.5 rounded-full shadow-xl pointer-events-auto text-xs">
-                    <span className="text-[11px] font-semibold text-slate-400 hidden md:inline mr-1">
-                      Quick Zoom:
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setZoomScale(1);
-                        setPanOffset({ x: 0, y: 0 });
-                      }}
-                      className={`px-2 py-0.5 rounded-md font-bold text-[11px] transition ${
-                        zoomScale === 1
-                          ? 'bg-blue-600 text-white'
-                          : 'text-slate-300 hover:bg-slate-800'
-                      }`}
-                    >
-                      Fit (100%)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setZoomScale(1.5)}
-                      className={`px-2 py-0.5 rounded-md font-bold text-[11px] transition ${
-                        zoomScale === 1.5
-                          ? 'bg-blue-600 text-white'
-                          : 'text-slate-300 hover:bg-slate-800'
-                      }`}
-                    >
-                      150%
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setZoomScale(2)}
-                      className={`px-2 py-0.5 rounded-md font-bold text-[11px] transition ${
-                        zoomScale === 2
-                          ? 'bg-blue-600 text-white'
-                          : 'text-slate-300 hover:bg-slate-800'
-                      }`}
-                    >
-                      200%
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setZoomScale(3)}
-                      className={`px-2 py-0.5 rounded-md font-bold text-[11px] transition ${
-                        zoomScale === 3
-                          ? 'bg-blue-600 text-white'
-                          : 'text-slate-300 hover:bg-slate-800'
-                      }`}
-                    >
-                      300%
-                    </button>
                   </div>
                 </div>
-              )}
-            </div>
 
-            {/* Footer with metadata & download */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs">
-              <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400 text-[11px]">
-                <span>
-                  Size: <strong className="text-slate-700 dark:text-slate-300">{(previewAttachment.file_size_bytes / (1024 * 1024)).toFixed(2)} MB</strong>
-                </span>
-                <span>•</span>
-                <span>
-                  Uploaded: <strong className="text-slate-700 dark:text-slate-300">{formatDate(previewAttachment.created_at)}</strong>
-                </span>
-                {previewAttachment.mime_type?.startsWith('image/') && (
-                  <>
-                    <span className="hidden sm:inline">•</span>
-                    <span className="hidden sm:inline text-blue-600 dark:text-blue-400 font-medium">
-                      💡 Scroll wheel to zoom • Drag to pan • Double click to zoom in
-                    </span>
-                  </>
+                {/* Toolbar Controls */}
+                <div className="flex items-center flex-wrap gap-1.5 sm:gap-2">
+                  {/* Image Controls: Zoom, Pan, Rotate, Invert */}
+                  {fileType === 'image' && (
+                    <>
+                      <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-0.5 border border-slate-200 dark:border-slate-700">
+                        <button
+                          type="button"
+                          onClick={handleZoomOut}
+                          className="p-1.5 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg transition disabled:opacity-40"
+                          disabled={zoomScale <= 0.5}
+                          title="Zoom Out (-25%)"
+                        >
+                          <ZoomOut className="w-4 h-4" />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={handleResetZoom}
+                          className="px-2 py-1 text-xs font-black text-slate-800 dark:text-white hover:text-blue-600 min-w-[50px] text-center"
+                          title="Click to reset zoom to 100%"
+                        >
+                          {Math.round(zoomScale * 100)}%
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={handleZoomIn}
+                          className="p-1.5 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg transition disabled:opacity-40"
+                          disabled={zoomScale >= 5}
+                          title="Zoom In (+25%)"
+                        >
+                          <ZoomIn className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleRotate}
+                        className="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl border border-slate-200 dark:border-slate-700 transition"
+                        title="Rotate 90° Clockwise"
+                      >
+                        <RotateCw className="w-4 h-4" />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setIsInverted((prev) => !prev)}
+                        className={`p-2 rounded-xl border transition flex items-center gap-1 text-xs font-semibold ${
+                          isInverted
+                            ? 'bg-amber-500 text-white border-amber-600 shadow-xs'
+                            : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700'
+                        }`}
+                        title="Toggle X-Ray Invert / High-Contrast Mode"
+                      >
+                        <Contrast className="w-4 h-4" />
+                        <span className="hidden sm:inline text-[11px]">X-Ray Invert</span>
+                      </button>
+
+                      {(zoomScale !== 1 || panOffset.x !== 0 || panOffset.y !== 0 || rotationAngle !== 0 || isInverted) && (
+                        <button
+                          type="button"
+                          onClick={handleResetZoom}
+                          className="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl border border-slate-200 dark:border-slate-700 transition"
+                          title="Reset Zoom, Position, and Rotation"
+                        >
+                          <RefreshCw className="w-4 h-4" />
+                        </button>
+                      )}
+                    </>
+                  )}
+
+                  {/* Text / Code Copy Button */}
+                  {fileType === 'text' && textContent && (
+                    <button
+                      type="button"
+                      onClick={handleCopyTextContent}
+                      className="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl border border-slate-200 dark:border-slate-700 transition flex items-center gap-1.5 text-xs font-semibold"
+                      title="Copy text content"
+                    >
+                      {copiedText ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                      <span className="hidden sm:inline">{copiedText ? 'Copied' : 'Copy Text'}</span>
+                    </button>
+                  )}
+
+                  {/* Open in New Window/Tab for PDF, Word, Excel, Docs */}
+                  {blobUrl && (
+                    <a
+                      href={blobUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl border border-slate-200 dark:border-slate-700 transition flex items-center gap-1 text-xs font-semibold"
+                      title="Open in new browser tab"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      <span className="hidden sm:inline text-[11px]">Open Tab</span>
+                    </a>
+                  )}
+
+                  {/* Universal Fullscreen Toggle for ALL file types */}
+                  <button
+                    type="button"
+                    onClick={() => setIsFullscreen((prev) => !prev)}
+                    className="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl border border-slate-200 dark:border-slate-700 transition flex items-center gap-1"
+                    title={isFullscreen ? 'Exit Fullscreen' : 'View in Fullscreen'}
+                  >
+                    {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                    <span className="hidden sm:inline text-[11px] font-semibold">{isFullscreen ? 'Exit' : 'Full Screen'}</span>
+                  </button>
+
+                  {/* Close Modal Button */}
+                  <button
+                    type="button"
+                    onClick={() => setPreviewAttachment(null)}
+                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition"
+                    title="Close Viewer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* VIEWPORT CANVAS (FORMAT-AWARE) */}
+              <div 
+                className={`relative my-3 flex-1 overflow-hidden flex items-center justify-center bg-slate-950 rounded-2xl select-none transition-all ${
+                  isFullscreen ? 'h-[calc(100vh-140px)]' : 'h-[65vh] min-h-[380px]'
+                } ${
+                  fileType === 'image'
+                    ? zoomScale > 1 
+                      ? isDragging 
+                        ? 'cursor-grabbing' 
+                        : 'cursor-grab' 
+                      : 'cursor-zoom-in'
+                    : 'cursor-default'
+                }`}
+                onWheel={handleWheelZoom}
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseUp}
+                onDoubleClick={handleDoubleClick}
+              >
+                {/* 1. IMAGE & X-RAY VIEWER */}
+                {fileType === 'image' && previewAttachment.file_data_base64 && (
+                  <div className="w-full h-full flex items-center justify-center overflow-hidden">
+                    <img
+                      src={previewAttachment.file_data_base64}
+                      alt={previewAttachment.file_name}
+                      draggable={false}
+                      style={{
+                        transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomScale}) rotate(${rotationAngle}deg)`,
+                        filter: isInverted ? 'invert(1) hue-rotate(180deg) contrast(130%)' : 'none',
+                        transition: isDragging ? 'none' : 'transform 0.12s ease-out',
+                        maxHeight: '100%',
+                        maxWidth: '100%',
+                        objectFit: 'contain',
+                        userSelect: 'none'
+                      }}
+                      className="pointer-events-none drop-shadow-2xl"
+                    />
+                  </div>
+                )}
+
+                {/* 2. PDF DOCUMENT VIEWER (Embedded in-window) */}
+                {fileType === 'pdf' && (
+                  <div className="w-full h-full p-1 sm:p-2 flex flex-col">
+                    {blobUrl ? (
+                      <iframe
+                        src={`${blobUrl}#view=FitH&toolbar=1`}
+                        className="w-full h-full rounded-xl border border-slate-800 bg-slate-900 shadow-inner"
+                        title={previewAttachment.file_name}
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-full text-slate-400">
+                        <FileText className="w-16 h-16 text-rose-500 mb-2" />
+                        <p className="font-bold">Loading PDF Document...</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 3. EXCEL & SPREADSHEET VIEWER (CSV Table or Excel Doc Preview) */}
+                {fileType === 'excel' && (
+                  <div className="w-full h-full p-2 sm:p-4 flex flex-col overflow-auto bg-slate-900">
+                    {csvRows.length > 0 ? (
+                      <div className="w-full h-full overflow-auto rounded-xl border border-slate-700 bg-slate-950 text-slate-200">
+                        <table className="w-full text-left text-xs border-collapse">
+                          <thead className="sticky top-0 bg-slate-800 text-emerald-400 font-bold uppercase border-b border-slate-700 shadow-xs">
+                            <tr>
+                              <th className="p-2.5 border-r border-slate-700 w-12 text-center text-slate-500">#</th>
+                              {csvRows[0].map((header, idx) => (
+                                <th key={idx} className="p-2.5 border-r border-slate-700 whitespace-nowrap">
+                                  {header || `Column ${idx + 1}`}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-800 text-slate-300">
+                            {csvRows.slice(1).map((row, rIdx) => (
+                              <tr key={rIdx} className="hover:bg-slate-800/60 transition-colors">
+                                <td className="p-2 border-r border-slate-800 text-center font-mono text-[11px] text-slate-500 bg-slate-900/60">
+                                  {rIdx + 1}
+                                </td>
+                                {row.map((cell, cIdx) => (
+                                  <td key={cIdx} className="p-2 border-r border-slate-800 whitespace-nowrap font-mono text-[11px]">
+                                    {cell}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-full text-center text-slate-300 py-12">
+                        <div className="p-4 bg-emerald-950/60 rounded-3xl border border-emerald-800 mb-4 text-emerald-400">
+                          <FileSpreadsheet className="w-16 h-16" />
+                        </div>
+                        <h4 className="font-bold text-lg text-white mb-1">{previewAttachment.original_name}</h4>
+                        <p className="text-xs text-slate-400 max-w-md mb-6">
+                          Microsoft Excel clinical spreadsheet ready for examination. View in Fullscreen or open directly in your preferred office application.
+                        </p>
+                        <div className="flex flex-wrap items-center gap-3">
+                          {blobUrl && (
+                            <a
+                              href={blobUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg transition flex items-center gap-2 text-xs"
+                            >
+                              <ExternalLink className="w-4 h-4" />
+                              <span>Open in Excel / Browser Tab</span>
+                            </a>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setIsFullscreen((prev) => !prev)}
+                            className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl border border-slate-700 transition flex items-center gap-2 text-xs"
+                          >
+                            <Maximize2 className="w-4 h-4" />
+                            <span>{isFullscreen ? 'Exit Fullscreen' : 'Fullscreen View'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 4. WORD DOCUMENT VIEWER (DOCX, DOC, RTF) */}
+                {fileType === 'word' && (
+                  <div className="w-full h-full p-4 flex flex-col items-center justify-center text-center bg-slate-900 text-slate-300">
+                    <div className="p-4 bg-blue-950/60 rounded-3xl border border-blue-800 mb-4 text-blue-400">
+                      <FileText className="w-16 h-16" />
+                    </div>
+                    <h4 className="font-bold text-lg text-white mb-1">{previewAttachment.original_name}</h4>
+                    <p className="text-xs text-slate-400 max-w-md mb-6">
+                      Microsoft Word clinical report document ready for examination. View in Fullscreen or open in Word/Docs.
+                    </p>
+                    <div className="flex flex-wrap items-center gap-3">
+                      {blobUrl && (
+                        <a
+                          href={blobUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg transition flex items-center gap-2 text-xs"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                          <span>Open in Word / Browser Tab</span>
+                        </a>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setIsFullscreen((prev) => !prev)}
+                        className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl border border-slate-700 transition flex items-center gap-2 text-xs"
+                      >
+                        <Maximize2 className="w-4 h-4" />
+                        <span>{isFullscreen ? 'Exit Fullscreen' : 'Fullscreen View'}</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* 5. TEXT / JSON / XML / LAB LOGS VIEWER */}
+                {fileType === 'text' && (
+                  <div className="w-full h-full p-3 sm:p-4 overflow-auto bg-slate-950 font-mono text-xs text-slate-300 rounded-xl">
+                    <pre className="whitespace-pre-wrap leading-relaxed select-text font-mono">
+                      {textContent || 'Loading document contents...'}
+                    </pre>
+                  </div>
+                )}
+
+                {/* 6. OTHER NON-IMAGE ATTACHMENTS */}
+                {fileType === 'other' && (
+                  <div className="text-center text-slate-400 py-16">
+                    <FileCheck className="w-16 h-16 mx-auto mb-3 text-indigo-400" />
+                    <p className="font-bold text-slate-200">{previewAttachment.original_name}</p>
+                    <p className="text-xs text-slate-500 mt-1">Clinical document ready. Download or open below to view.</p>
+                  </div>
+                )}
+
+                {/* Overlay Quick Zoom Presets Bar for Images Only */}
+                {fileType === 'image' && (
+                  <div className="absolute bottom-3 inset-x-0 flex justify-center items-center pointer-events-none px-4">
+                    <div className="flex items-center gap-1.5 bg-slate-900/85 backdrop-blur-md border border-slate-700/80 px-3 py-1.5 rounded-full shadow-xl pointer-events-auto text-xs">
+                      <span className="text-[11px] font-semibold text-slate-400 hidden md:inline mr-1">
+                        Quick Zoom:
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setZoomScale(1);
+                          setPanOffset({ x: 0, y: 0 });
+                        }}
+                        className={`px-2 py-0.5 rounded-md font-bold text-[11px] transition ${
+                          zoomScale === 1
+                            ? 'bg-blue-600 text-white'
+                            : 'text-slate-300 hover:bg-slate-800'
+                        }`}
+                      >
+                        Fit (100%)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setZoomScale(1.5)}
+                        className={`px-2 py-0.5 rounded-md font-bold text-[11px] transition ${
+                          zoomScale === 1.5
+                            ? 'bg-blue-600 text-white'
+                            : 'text-slate-300 hover:bg-slate-800'
+                        }`}
+                      >
+                        150%
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setZoomScale(2)}
+                        className={`px-2 py-0.5 rounded-md font-bold text-[11px] transition ${
+                          zoomScale === 2
+                            ? 'bg-blue-600 text-white'
+                            : 'text-slate-300 hover:bg-slate-800'
+                        }`}
+                      >
+                        200%
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setZoomScale(3)}
+                        className={`px-2 py-0.5 rounded-md font-bold text-[11px] transition ${
+                          zoomScale === 3
+                            ? 'bg-blue-600 text-white'
+                            : 'text-slate-300 hover:bg-slate-800'
+                        }`}
+                      >
+                        300%
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
-              
-              {previewAttachment.file_data_base64 && (
-                <a
-                  href={previewAttachment.file_data_base64}
-                  download={previewAttachment.original_name}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-xs transition"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>Download High-Res Original</span>
-                </a>
-              )}
-            </div>
 
+              {/* Footer with metadata & download */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs">
+                <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400 text-[11px]">
+                  <span>
+                    Size: <strong className="text-slate-700 dark:text-slate-300">{(previewAttachment.file_size_bytes / (1024 * 1024)).toFixed(2)} MB</strong>
+                  </span>
+                  <span>•</span>
+                  <span>
+                    Uploaded: <strong className="text-slate-700 dark:text-slate-300">{formatDate(previewAttachment.created_at)}</strong>
+                  </span>
+                  {fileType === 'image' && (
+                    <>
+                      <span className="hidden sm:inline">•</span>
+                      <span className="hidden sm:inline text-blue-600 dark:text-blue-400 font-medium">
+                        💡 Scroll wheel to zoom • Drag to pan • Double click to zoom in
+                      </span>
+                    </>
+                  )}
+                  {fileType === 'pdf' && (
+                    <>
+                      <span className="hidden sm:inline">•</span>
+                      <span className="hidden sm:inline text-rose-600 dark:text-rose-400 font-medium">
+                        📄 Interactive PDF Reader with page navigation & search
+                      </span>
+                    </>
+                  )}
+                  {fileType === 'excel' && (
+                    <>
+                      <span className="hidden sm:inline">•</span>
+                      <span className="hidden sm:inline text-emerald-600 dark:text-emerald-400 font-medium">
+                        📊 Clinical Spreadsheet with row & column inspection
+                      </span>
+                    </>
+                  )}
+                </div>
+                
+                {previewAttachment.file_data_base64 && (
+                  <a
+                    href={previewAttachment.file_data_base64}
+                    download={previewAttachment.original_name}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-xs transition"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Download Original File</span>
+                  </a>
+                )}
+              </div>
+
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
     </div>
   );
