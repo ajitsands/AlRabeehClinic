@@ -47,6 +47,9 @@
   - **Local File Upload**: Drag-and-drop or select any image (PNG, JPG, WebP up to 5MB) converting to Base64 in local IndexedDB.
   - **Web URL Link**: Direct image URL with quick presets (Male Dr, Female Dr, Dental Surgeon).
   - **Live Preview & Color Accent**: Real-time avatar preview with doctor's designated chair color ring and status indicator.
+- **Dental Services Multi-Field Search & Catalog Filters**:
+  - Live search across **Procedure Title, Standard Price (e.g. 25.000), Slot Duration (e.g. 30m, 60m, 1 slot), and Category**.
+  - Category filters, Slot Duration selector (30m, 60m, 90m, 120m+), and Price/Duration sorting controls.
 
 ### ✅ E. Vitals Tracker & High-Capacity File Attachments
 - **Full Clinical Vitals Log**: Blood Pressure, Resting Pulse, Temperature, Blood Sugar, SpO2, Weight, and Visual Analog Dental Pain Scale (0-10) with facial indicators.
