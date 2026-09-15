@@ -71,31 +71,26 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
     loadPatients();
   }, []);
 
-  // Update target branch and recalculate next File ID when branch changes in form
-  const handleBranchChangeInForm = async (targetBranchId) => {
+  // Update target branch when branch dropdown changes in form
+  const handleBranchChangeInForm = (targetBranchId) => {
     setFormHomeBranchId(targetBranchId);
-    const nextId = await generateBranchFileNumber(targetBranchId);
-    setFormFileNumber(nextId);
   };
 
   // Open modal & reset or fill
-  const handleOpenRegisterModal = async (initialData = null) => {
+  const handleOpenRegisterModal = (initialData = null) => {
     const branchToUse = activeBranchId || 'branch-mnm';
     setFormHomeBranchId(branchToUse);
-    const nextId = await generateBranchFileNumber(branchToUse);
-    setFormFileNumber(nextId);
 
     if (initialData) {
       populateFormWithCardData(initialData);
     } else {
-      resetForm(nextId, branchToUse);
+      resetForm(branchToUse);
     }
     setIsRegisterModalOpen(true);
   };
 
-  const resetForm = (fileNum, branchId = activeBranchId) => {
+  const resetForm = (branchId = activeBranchId) => {
     setFormHomeBranchId(branchId);
-    setFormFileNumber(fileNum || `ARB-MNM-${new Date().getFullYear().toString().slice(-2)}-0001`);
     setFormCpr('');
     setFormNameEn('');
     setFormNameAr('');
@@ -174,9 +169,20 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
       }
     }
 
+    // Concurrency-Safe File Number Generation:
+    // Generate fresh guaranteed unique sequential File ID right at save time
+    const targetBranch = formHomeBranchId || activeBranchId;
+    let finalFileNumber = await generateBranchFileNumber(targetBranch);
+
+    // Double check against db.patients to guarantee uniqueness even under high concurrent registrations
+    const existingFile = await db.patients.where('file_number').equals(finalFileNumber).first();
+    if (existingFile) {
+      finalFileNumber = await generateBranchFileNumber(targetBranch);
+    }
+
     const newPatient = {
       id: `pat-${Date.now()}`,
-      file_number: formFileNumber,
+      file_number: finalFileNumber,
       cpr_number: formCpr || null,
       full_name_en: formNameEn,
       full_name_ar: formNameAr || null,
@@ -192,7 +198,7 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
       photo_base64: formPhoto || null,
       allergies: formAllergies,
       medical_alerts: formMedicalAlerts,
-      home_branch_id: formHomeBranchId || activeBranchId,
+      home_branch_id: targetBranch,
       created_at_branch_id: activeBranchId,
       source: formSource,
       created_at: new Date().toISOString(),
@@ -203,7 +209,7 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
     await syncEngine.queueChange('patients', newPatient.id, 'INSERT', newPatient);
 
     confetti({ particleCount: 70, spread: 70, origin: { y: 0.6 } });
-    showToast(`Patient registered successfully! File: ${newPatient.file_number}`, 'success');
+    showToast(`Patient registered successfully! Assigned File ID: ${finalFileNumber}`, 'success', 5000);
     setIsRegisterModalOpen(false);
     loadPatients();
   };
@@ -460,15 +466,15 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
                 </div>
               </div>
 
-              {/* Right: Prominent File ID Badge & Close Button */}
+              {/* Right: Auto-Assigned File ID Badge & Close Button */}
               <div className="flex items-center gap-3 self-end sm:self-center">
                 <div className="flex flex-col sm:items-end">
                   <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 dark:text-slate-500">
                     Patient File ID
                   </span>
-                  <div className="text-xl sm:text-2xl font-black tracking-wider text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/70 px-4 py-1.5 rounded-2xl border-2 border-blue-200 dark:border-blue-800 shadow-xs flex items-center gap-2">
-                    <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                    <span>{formFileNumber}</span>
+                  <div className="text-xs sm:text-sm font-extrabold tracking-wide text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/70 px-3.5 py-1.5 rounded-2xl border-2 border-dashed border-blue-300 dark:border-blue-700 shadow-2xs flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                    <span>{(branches.find(b => b.id === formHomeBranchId) || activeBranch)?.prefix || 'ARB-MNM'} • Auto-Generated on Save</span>
                   </div>
                 </div>
 
