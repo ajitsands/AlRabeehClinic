@@ -20,6 +20,11 @@
 - **Side-by-Side Doctor Columns**: Full matrix view showing all 5 clinic doctors with color-coded specialties and designated dental chairs.
 - **Dynamic Slot System**: 30 min, 60 min, and 90 min procedure slots with live hover timings.
 - **Clinic Lunch & Prayer Break Protection**: Strict 13:00 – 14:00 timeblock protection preventing double-booking or scheduling during breaks.
+- **Drag & Drop Rescheduling**: Grab any appointment card and drop it onto any doctor's time slot on the calendar grid with real-time collision checks, break-time protection, and immediate background sync.
+- **Dedicated Reschedule Modal (Different Date / Time / Doctor)**:
+  - 1-click access via direct card icon or appointment details window.
+  - Quick-pick date jumps (`Today`, `Tomorrow`, `+2 Days`, `Next Week`) + full calendar date selector.
+  - Doctor reassignment, time-slot picker with live collision validation, and slot duration adjustments.
 - **Real-Time Big & Bold Status Count Badges**:
   - `● Confirmed [Count]`
   - `● Checked-In [Count]`
@@ -73,23 +78,38 @@ cp -r dental-app/dist/assets .
 
 ---
 
-## 🎯 4. Starting Points for Next Session (Resume In 5 Hours)
+## 🎯 4. Future Modules Roadmap (Saved for Development Reference)
 
-When development restarts, here are recommended next areas to build or refine based on clinic workflow requirements:
+The following modules are documented and scheduled for upcoming development phases:
 
-1. **Billing & Invoicing Module**:
-   - Generate official Bahrain VAT dental invoices with PDF export and print layouts.
-   - Insurance claims processing (e.g., MedNet, Bupa, Bahrain National Insurance).
-2. **Interactive Dental Odontogram / Tooth Charting**:
-   - Visual 32-tooth adult + 20-tooth pediatric interactive chart.
-   - Tooth-specific treatments: Cavity, Restoration, Root Canal, Crown, Extraction, Implant.
-3. **Prescription & Pharmacy Management**:
-   - Doctor e-prescription generator with dosage instructions (English + Arabic).
-4. **Automated WhatsApp / SMS Reminders**:
-   - 24-hour appointment confirmation and reminder dispatch via clinic WhatsApp gateway.
-5. **Detailed Reports & Financial Analytics**:
-   - Daily revenue by doctor, chair utilization rates, and patient visit analytics.
+### 1. 🦷 Interactive Dental Odontogram / Tooth Charting
+- **Adult & Pediatric Tooth Charts**: Visual 32-tooth adult (FDI / Universal numbering) + 20-tooth primary pediatric chart.
+- **Surface-Level Diagnosis & Conditions**: Occlusal, Mesial, Distal, Buccal, Lingual surface selection.
+- **Color-Coded Statuses**: Existing condition (Healthy, Decayed/Caries, Missing, Impacted, Crown, Bridge, Filled, Root Canal) vs. Proposed Treatment vs. Completed Treatment.
+- **Linked Treatment Plans**: Automatic service and cost calculation from marked tooth procedures linked to patient record.
+
+### 2. 🧾 Billing, Bahrain VAT & Insurance Invoicing
+- **National VAT Invoicing**: Compliant with Bahrain National Bureau for Revenue (NBR) rules (10% VAT calculation, Tax Invoice format, Tax Registration Number).
+- **Payment Processing**: Multi-mode tender (BenefitPay, Credit/Debit Card, Cash, Insurance Split).
+- **Insurance Copay & Claims**: Direct billing support for MedNet, Bupa Arabia, Bahrain National Insurance (BNI), Solidarity, Takaful, with claim form generation.
+- **PDF Export & Thermal Receipt Printing**: Formats for standard A4 clinical invoices and 80mm POS thermal slips.
+
+### 3. 💊 E-Prescriptions & Medication Management
+- **Doctor Rx Generator**: Multi-drug prescription pad with dosage, frequency, duration, instructions (English & Arabic).
+- **Standard Dental Drug Formulary**: Quick templates for antibiotics (Amoxicillin, Augmentin, Clindamycin), analgesics (Ibuprofen, Paracetamol), and antiseptics (Chlorhexidine rinse).
+- **Printable & WhatsApp Rx**: One-click printable prescription slip and instant WhatsApp PDF delivery to patient.
+
+### 4. 📱 Automated WhatsApp & SMS Reminders Gateway
+- **Appointment Confirmations**: Automated 24-hour and 2-hour pre-appointment reminders.
+- **WhatsApp Web / API Direct Link**: Click-to-send template messages with doctor name, clinic GPS, and appointment time.
+- **Post-Treatment Follow-Ups**: Automated check-in reminders after extractions or surgeries.
+
+### 5. 📈 Financial Reports & Chair Utilization Analytics
+- **Doctor Revenue Breakdown**: Total collections, procedures performed, and commissions per doctor.
+- **Chair Occupancy & Utilization**: Matrix showing utilization rates across chairs 1–5.
+- **Daily Cash Register & Day-End Reconciliation**: Daily Z-Report for reception desk balancing.
 
 ---
 
-*Note saved for next session handover.*
+*Handover & Roadmap Reference Document — Updated September 15, 2026*
+

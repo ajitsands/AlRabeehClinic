@@ -22,7 +22,11 @@ import {
   Filter, 
   UserCheck,
   Coffee,
-  Ban
+  Ban,
+  Move,
+  CalendarSync,
+  ArrowRight,
+  GripVertical
 } from 'lucide-react';
 
 export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen, setIsModalOpen, preselectedSlot, setPreselectedSlot }) {
@@ -43,6 +47,20 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
 
   // Appointment Details Modal
   const [activeAppointment, setActiveAppointment] = useState(null);
+
+  // Drag & Drop State
+  const [draggedAppointment, setDraggedAppointment] = useState(null);
+  const [dragOverTarget, setDragOverTarget] = useState(null); // { doctorId, timeSlot }
+
+  // Dedicated Reschedule Modal State
+  const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState(false);
+  const [rescheduleTarget, setRescheduleTarget] = useState(null);
+  const [rescheduleDate, setRescheduleDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [rescheduleDoctorId, setRescheduleDoctorId] = useState('');
+  const [rescheduleStartTime, setRescheduleStartTime] = useState(timeSlots[0] || '09:00');
+  const [rescheduleSlotCount, setRescheduleSlotCount] = useState(1);
+  const [rescheduleDurationMins, setRescheduleDurationMins] = useState(30);
+  const [rescheduleReason, setRescheduleReason] = useState('');
 
   // Form State for New Booking
   const [bookingDoctorId, setBookingDoctorId] = useState('');
@@ -186,6 +204,174 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
     setBookingChiefComplaint('');
     setBookingNotes('');
     setPatientSearchQuery('');
+  };
+
+  // --- DRAG & DROP RESCHEDULING LOGIC ---
+  const handleDragStart = (e, appointment) => {
+    e.dataTransfer.setData('text/plain', appointment.id);
+    e.dataTransfer.effectAllowed = 'move';
+    setDraggedAppointment(appointment);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedAppointment(null);
+    setDragOverTarget(null);
+  };
+
+  const handleDropAppointment = async (targetDoctorId, targetStartTime) => {
+    if (!draggedAppointment) return;
+
+    // 1. Same slot check
+    if (draggedAppointment.doctor_id === targetDoctorId && draggedAppointment.start_time === targetStartTime) {
+      setDraggedAppointment(null);
+      setDragOverTarget(null);
+      return;
+    }
+
+    const targetDoc = doctors.find(d => d.id === targetDoctorId);
+    const slotCount = draggedAppointment.slot_count || 1;
+    const startIndex = timeSlots.indexOf(targetStartTime);
+
+    if (startIndex === -1) {
+      showToast('Invalid time slot', 'error');
+      setDraggedAppointment(null);
+      setDragOverTarget(null);
+      return;
+    }
+
+    const endIndex = startIndex + slotCount;
+    const calculatedEndTime = timeSlots[endIndex] || settings.clinic_close_time || '17:30';
+
+    // 2. Break Time Check
+    for (let i = startIndex; i < endIndex; i++) {
+      const slotT = timeSlots[i];
+      if (slotT && isSlotInBreak(slotT, settings)) {
+        showToast(`Cannot move appointment: Spans into Clinic ${settings.break_label || 'Lunch Break'} (${settings.break_start_time} - ${settings.break_end_time})!`, 'error');
+        setDraggedAppointment(null);
+        setDragOverTarget(null);
+        return;
+      }
+    }
+
+    // 3. Collision Check for Target Doctor on this date
+    const collision = appointments.some(app => {
+      if (app.id === draggedAppointment.id || app.doctor_id !== targetDoctorId || app.status === 'CANCELLED') return false;
+      const aStart = timeSlots.indexOf(app.start_time);
+      const aEnd = aStart + (app.slot_count || 1);
+      return Math.max(startIndex, aStart) < Math.min(endIndex, aEnd);
+    });
+
+    if (collision) {
+      showToast(`Cannot move: Doctor ${targetDoc ? targetDoc.name : ''} already has an appointment at this time!`, 'error');
+      setDraggedAppointment(null);
+      setDragOverTarget(null);
+      return;
+    }
+
+    // 4. Update in Dexie & Background Sync
+    const pt = patients.find(p => p.id === draggedAppointment.patient_id);
+    const updatedData = {
+      doctor_id: targetDoctorId,
+      start_time: targetStartTime,
+      end_time: calculatedEndTime,
+      updated_at: new Date().toISOString()
+    };
+
+    await db.appointments.update(draggedAppointment.id, updatedData);
+    const updated = await db.appointments.get(draggedAppointment.id);
+    await syncEngine.queueChange('appointments', draggedAppointment.id, 'UPDATE', updated);
+
+    confetti({ particleCount: 40, spread: 50, origin: { y: 0.6 } });
+    showToast(`Appointment for ${pt ? pt.full_name_en : 'Patient'} rescheduled to ${targetDoc ? targetDoc.name : 'Doctor'} at ${targetStartTime}!`, 'success');
+
+    setDraggedAppointment(null);
+    setDragOverTarget(null);
+    loadData();
+  };
+
+  // --- DEDICATED RESCHEDULE MODAL LOGIC ---
+  const handleOpenRescheduleModal = (appointment) => {
+    setRescheduleTarget(appointment);
+    setRescheduleDate(appointment.appointment_date || selectedDate);
+    setRescheduleDoctorId(appointment.doctor_id);
+    setRescheduleStartTime(appointment.start_time);
+    setRescheduleSlotCount(appointment.slot_count || 1);
+    setRescheduleDurationMins(appointment.duration_mins || ((appointment.slot_count || 1) * 30));
+    setRescheduleReason('');
+    setIsRescheduleModalOpen(true);
+    setActiveAppointment(null);
+  };
+
+  const handleConfirmReschedule = async (e) => {
+    e.preventDefault();
+    if (!rescheduleTarget || !rescheduleDoctorId || !rescheduleDate || !rescheduleStartTime) {
+      showToast('Please select Date, Doctor, and Start Time', 'error');
+      return;
+    }
+
+    const startIndex = timeSlots.indexOf(rescheduleStartTime);
+    const count = Number(rescheduleSlotCount);
+    const endIndex = startIndex + count;
+    const calculatedEndTime = timeSlots[endIndex] || settings.clinic_close_time || '17:30';
+
+    // 1. Break Time Check
+    for (let i = startIndex; i < endIndex; i++) {
+      const slotT = timeSlots[i];
+      if (slotT && isSlotInBreak(slotT, settings)) {
+        showToast(`Cannot reschedule: Time spans into Clinic ${settings.break_label || 'Lunch Break'} (${settings.break_start_time} - ${settings.break_end_time})!`, 'error');
+        return;
+      }
+    }
+
+    // 2. Doctor Collision Check on target date
+    const targetDateAppointments = await db.appointments
+      .where('appointment_date')
+      .equals(rescheduleDate)
+      .toArray();
+
+    const collision = targetDateAppointments.some(app => {
+      if (app.id === rescheduleTarget.id || app.doctor_id !== rescheduleDoctorId || app.status === 'CANCELLED') return false;
+      const aStart = timeSlots.indexOf(app.start_time);
+      const aEnd = aStart + (app.slot_count || 1);
+      return Math.max(startIndex, aStart) < Math.min(endIndex, aEnd);
+    });
+
+    if (collision) {
+      showToast('Cannot reschedule: Time slot is already booked for this doctor on the selected date!', 'error');
+      return;
+    }
+
+    const appendNote = rescheduleReason
+      ? `${rescheduleTarget.notes ? rescheduleTarget.notes + ' | ' : ''}Rescheduled on ${new Date().toLocaleDateString()}: ${rescheduleReason}`
+      : rescheduleTarget.notes;
+
+    const updatedData = {
+      appointment_date: rescheduleDate,
+      doctor_id: rescheduleDoctorId,
+      start_time: rescheduleStartTime,
+      end_time: calculatedEndTime,
+      slot_count: count,
+      duration_mins: Number(rescheduleDurationMins),
+      notes: appendNote,
+      updated_at: new Date().toISOString()
+    };
+
+    await db.appointments.update(rescheduleTarget.id, updatedData);
+    const updated = await db.appointments.get(rescheduleTarget.id);
+    await syncEngine.queueChange('appointments', rescheduleTarget.id, 'UPDATE', updated);
+
+    confetti({ particleCount: 60, spread: 70, origin: { y: 0.6 } });
+    showToast(`Appointment successfully rescheduled to ${rescheduleDate} at ${rescheduleStartTime}!`, 'success');
+
+    setIsRescheduleModalOpen(false);
+    setRescheduleTarget(null);
+
+    // Switch calendar date to target date so user immediately sees the rescheduled appointment
+    if (rescheduleDate !== selectedDate) {
+      setSelectedDate(rescheduleDate);
+    } else {
+      loadData();
+    }
   };
 
   // Update Appointment Status
@@ -457,6 +643,9 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
                         );
                       }
 
+                      // Check if this slot is being dragged over
+                      const isHoveredForDrop = dragOverTarget?.doctorId === doc.id && dragOverTarget?.timeSlot === timeSlot;
+
                       // 2. Check if this time slot is the START of an appointment
                       const appStarting = appointments.find(
                         a => a.doctor_id === doc.id && a.start_time === timeSlot && a.status !== 'CANCELLED'
@@ -476,6 +665,9 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
                         return (
                           <div
                             key={`${doc.id}-${timeSlot}`}
+                            onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
+                            onDragEnter={() => setDragOverTarget({ doctorId: doc.id, timeSlot })}
+                            onDrop={() => handleDropAppointment(doc.id, timeSlot)}
                             className="border-r border-slate-200 dark:border-slate-800/80 bg-blue-50/20 dark:bg-blue-950/10"
                           />
                         );
@@ -485,6 +677,7 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
                         const pt = patients.find(p => p.id === appStarting.patient_id);
                         const srv = services.find(s => s.id === appStarting.service_id);
                         const slots = appStarting.slot_count || 1;
+                        const isBeingDragged = draggedAppointment?.id === appStarting.id;
                         const heightStyle = {
                           height: `calc(${slots * 88}px - 8px)`,
                           zIndex: 10
@@ -493,23 +686,49 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
                         return (
                           <div
                             key={`${doc.id}-${timeSlot}`}
+                            onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
+                            onDragEnter={() => setDragOverTarget({ doctorId: doc.id, timeSlot })}
+                            onDrop={() => handleDropAppointment(doc.id, timeSlot)}
                             className="p-1 border-r border-slate-200 dark:border-slate-800/80 relative"
                           >
                             <div
+                              draggable={true}
+                              onDragStart={(e) => handleDragStart(e, appStarting)}
+                              onDragEnd={handleDragEnd}
                               onClick={() => setActiveAppointment({ ...appStarting, patient: pt, service: srv, doctor: doc })}
                               style={heightStyle}
-                              className={`absolute inset-x-1 top-1 rounded-2xl p-3 shadow-sm border flex flex-col justify-between overflow-hidden cursor-pointer hover:shadow-md hover:scale-[1.005] transition-all ${
-                                getStatusBadge(appStarting.status)
-                              }`}
+                              className={`absolute inset-x-1 top-1 rounded-2xl p-3 shadow-sm border flex flex-col justify-between overflow-hidden cursor-grab active:cursor-grabbing hover:shadow-md hover:scale-[1.005] transition-all group ${
+                                isBeingDragged ? 'opacity-40 scale-95 border-dashed border-blue-500 ring-2 ring-blue-400' : ''
+                              } ${getStatusBadge(appStarting.status)}`}
+                              title="Drag to another time/doctor to reschedule, or click for details"
                             >
                               <div className="space-y-1">
                                 <div className="flex items-center justify-between gap-1">
-                                  <span className="font-black text-xs sm:text-sm text-slate-900 dark:text-white truncate">
-                                    {pt ? pt.full_name_en : 'Patient'}
-                                  </span>
-                                  <span className="px-2 py-0.5 text-[9px] font-extrabold uppercase rounded-lg bg-white/90 dark:bg-slate-800/90 shadow-2xs shrink-0">
-                                    {appStarting.status}
-                                  </span>
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <GripVertical className="w-3.5 h-3.5 text-slate-400 opacity-60 group-hover:opacity-100 shrink-0 cursor-grab" />
+                                    <span className="font-black text-xs sm:text-sm text-slate-900 dark:text-white truncate">
+                                      {pt ? pt.full_name_en : 'Patient'}
+                                    </span>
+                                  </div>
+                                  
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    {/* 1-Click Direct Reschedule Button */}
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleOpenRescheduleModal({ ...appStarting, patient: pt, service: srv, doctor: doc });
+                                      }}
+                                      className="p-1 rounded-lg bg-white/90 dark:bg-slate-800/90 text-blue-600 dark:text-blue-400 hover:bg-blue-600 hover:text-white transition shadow-2xs"
+                                      title="Reschedule to another Date or Time"
+                                    >
+                                      <CalendarSync className="w-3 h-3" />
+                                    </button>
+                                    
+                                    <span className="px-1.5 py-0.5 text-[9px] font-extrabold uppercase rounded-lg bg-white/90 dark:bg-slate-800/90 shadow-2xs">
+                                      {appStarting.status}
+                                    </span>
+                                  </div>
                                 </div>
 
                                 <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-700 dark:text-slate-200 truncate">
@@ -538,23 +757,42 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
                         );
                       }
 
-                      // Empty Slot -> Click to book with Timing pill on hover
+                      // Empty Slot -> Click to book or Drop Target for Drag & Drop
                       return (
                         <div
                           key={`${doc.id}-${timeSlot}`}
+                          onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
+                          onDragEnter={() => setDragOverTarget({ doctorId: doc.id, timeSlot })}
+                          onDragLeave={() => {
+                            if (dragOverTarget?.doctorId === doc.id && dragOverTarget?.timeSlot === timeSlot) {
+                              setDragOverTarget(null);
+                            }
+                          }}
+                          onDrop={() => handleDropAppointment(doc.id, timeSlot)}
                           onClick={() => handleSlotClick(doc.id, timeSlot)}
-                          className="p-1 border-r border-slate-200 dark:border-slate-800/80 group hover:bg-blue-50/50 dark:hover:bg-blue-950/20 cursor-pointer flex items-center justify-center transition-colors"
+                          className={`p-1 border-r border-slate-200 dark:border-slate-800/80 group cursor-pointer flex items-center justify-center transition-all ${
+                            isHoveredForDrop
+                              ? 'bg-blue-100/70 dark:bg-blue-900/50 ring-2 ring-blue-500 ring-inset'
+                              : 'hover:bg-blue-50/50 dark:hover:bg-blue-950/20'
+                          }`}
                         >
-                          <div className="opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center gap-1 bg-white dark:bg-slate-800 px-3 py-1.5 rounded-xl shadow-md border border-blue-200 dark:border-blue-800 transition-all transform scale-95 group-hover:scale-100">
-                            <div className="flex items-center gap-1 text-[11px] font-extrabold text-blue-600 dark:text-blue-400">
-                              <Plus className="w-3.5 h-3.5" />
-                              <span>Book Slot</span>
+                          {isHoveredForDrop ? (
+                            <div className="flex flex-col items-center justify-center gap-1 text-blue-700 dark:text-blue-300 font-extrabold text-xs animate-bounce">
+                              <Move className="w-4 h-4" />
+                              <span>Drop to Move ({timeSlot})</span>
                             </div>
-                            <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/60 px-1.5 py-0.5 rounded-md border border-slate-200 dark:border-slate-700">
-                              <Clock className="w-2.5 h-2.5 text-blue-500" />
-                              <span>{timeSlot} - {nextSlotTime}</span>
+                          ) : (
+                            <div className="opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center gap-1 bg-white dark:bg-slate-800 px-3 py-1.5 rounded-xl shadow-md border border-blue-200 dark:border-blue-800 transition-all transform scale-95 group-hover:scale-100">
+                              <div className="flex items-center gap-1 text-[11px] font-extrabold text-blue-600 dark:text-blue-400">
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>Book Slot</span>
+                              </div>
+                              <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/60 px-1.5 py-0.5 rounded-md border border-slate-200 dark:border-slate-700">
+                                <Clock className="w-2.5 h-2.5 text-blue-500" />
+                                <span>{timeSlot} - {nextSlotTime}</span>
+                              </div>
                             </div>
-                          </div>
+                          )}
                         </div>
                       );
                     })}
@@ -861,9 +1099,21 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
                         setActiveAppointment(null);
                       }
                     }}
-                    className="col-span-2 px-2.5 py-2 rounded-xl font-bold bg-blue-600 text-white hover:bg-blue-700 transition"
+                    className="col-span-2 px-2.5 py-2 rounded-xl font-bold bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
                   >
                     View Patient File & Vitals
+                  </button>
+                </div>
+
+                {/* Prominent Reschedule Button */}
+                <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => handleOpenRescheduleModal(activeAppointment)}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-extrabold text-xs text-white bg-gradient-to-r from-blue-600 via-indigo-600 to-teal-600 hover:from-blue-700 hover:to-teal-700 shadow-md shadow-blue-500/20 transition-all cursor-pointer"
+                  >
+                    <CalendarSync className="w-4 h-4" />
+                    <span>Reschedule (Change Date, Time Slot, or Doctor)</span>
                   </button>
                 </div>
               </div>
@@ -874,6 +1124,228 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
         </div>
       )}
 
+      {/* DEDICATED RESCHEDULE APPOINTMENT MODAL */}
+      {isRescheduleModalOpen && rescheduleTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 max-h-[92vh] overflow-y-auto">
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20">
+                  <CalendarSync className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base sm:text-lg text-slate-900 dark:text-white">
+                    Reschedule Dental Appointment
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Patient: <span className="font-bold text-slate-700 dark:text-slate-200">{rescheduleTarget.patient?.full_name_en || 'Patient'}</span> (CPR: {rescheduleTarget.patient?.cpr_number || 'N/A'})
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsRescheduleModalOpen(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmReschedule} className="space-y-4 mt-4">
+              
+              {/* Current Booking Summary Pill */}
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div>
+                  <span className="text-slate-400 block text-[10px] font-bold uppercase">Current Scheduled Time</span>
+                  <span className="font-extrabold text-slate-800 dark:text-slate-200">
+                    {rescheduleTarget.appointment_date} • {rescheduleTarget.start_time} - {rescheduleTarget.end_time}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-slate-400 block text-[10px] font-bold uppercase">Doctor & Service</span>
+                  <span className="font-bold text-blue-600 dark:text-blue-400">
+                    {rescheduleTarget.doctor?.name} • {rescheduleTarget.service?.name}
+                  </span>
+                </div>
+              </div>
+
+              {/* 1. Target Date Selector with Quick Pick Chips */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+                  1. Choose New Date
+                </label>
+                
+                <div className="flex flex-wrap items-center gap-2 mb-2">
+                  <button
+                    type="button"
+                    onClick={() => setRescheduleDate(new Date().toISOString().split('T')[0])}
+                    className={`px-3 py-1 text-xs font-bold rounded-lg border transition ${
+                      rescheduleDate === new Date().toISOString().split('T')[0]
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    Today
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const d = new Date();
+                      d.setDate(d.getDate() + 1);
+                      setRescheduleDate(d.toISOString().split('T')[0]);
+                    }}
+                    className="px-3 py-1 text-xs font-bold rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 transition"
+                  >
+                    Tomorrow
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const d = new Date();
+                      d.setDate(d.getDate() + 2);
+                      setRescheduleDate(d.toISOString().split('T')[0]);
+                    }}
+                    className="px-3 py-1 text-xs font-bold rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 transition"
+                  >
+                    +2 Days
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const d = new Date();
+                      d.setDate(d.getDate() + 7);
+                      setRescheduleDate(d.toISOString().split('T')[0]);
+                    }}
+                    className="px-3 py-1 text-xs font-bold rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 transition"
+                  >
+                    Next Week
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2 p-2 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                  <CalendarIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  <input
+                    type="date"
+                    value={rescheduleDate}
+                    onChange={(e) => setRescheduleDate(e.target.value)}
+                    required
+                    className="bg-transparent font-bold text-sm text-slate-900 dark:text-white focus:outline-none w-full cursor-pointer"
+                  />
+                </div>
+              </div>
+
+              {/* 2. Treating Doctor & Chair */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
+                  2. Treating Doctor / Chair
+                </label>
+                <select
+                  value={rescheduleDoctorId}
+                  onChange={(e) => setRescheduleDoctorId(e.target.value)}
+                  required
+                  className="w-full px-3.5 py-2.5 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-medium"
+                >
+                  {doctors.map(d => (
+                    <option key={d.id} value={d.id}>
+                      {d.name} ({d.chair_number} - {d.specialty})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 3. Slot Configuration & Duration */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-blue-50/50 dark:bg-blue-950/20 p-3.5 rounded-2xl border border-blue-100 dark:border-blue-900">
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">
+                    New Start Time
+                  </label>
+                  <select
+                    value={rescheduleStartTime}
+                    onChange={(e) => setRescheduleStartTime(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl text-xs font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                  >
+                    {timeSlots.map(t => {
+                      const isBrk = isSlotInBreak(t, settings);
+                      return (
+                        <option key={t} value={t} disabled={isBrk}>
+                          {t} {isBrk ? `⚠️ (${settings.break_label || 'Break Time'} - Closed)` : ''}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">
+                    Slots Spanned
+                  </label>
+                  <select
+                    value={rescheduleSlotCount}
+                    onChange={(e) => {
+                      const count = Number(e.target.value);
+                      setRescheduleSlotCount(count);
+                      setRescheduleDurationMins(count * 30);
+                    }}
+                    className="w-full px-3 py-2 rounded-xl text-xs font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                  >
+                    <option value={1}>1 Slot (30 mins)</option>
+                    <option value={2}>2 Slots (1 Hour)</option>
+                    <option value={3}>3 Slots (1.5 Hours)</option>
+                    <option value={4}>4 Slots (2 Hours)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">
+                    New Duration
+                  </label>
+                  <div className="px-3 py-2 rounded-xl text-xs font-extrabold bg-blue-600 text-white flex items-center justify-between">
+                    <span>{rescheduleDurationMins} Mins</span>
+                    <Clock className="w-3.5 h-3.5 text-blue-200" />
+                  </div>
+                </div>
+              </div>
+
+              {/* 4. Reschedule Reason / Note */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
+                  Reason for Reschedule (Optional Note)
+                </label>
+                <input
+                  type="text"
+                  value={rescheduleReason}
+                  onChange={(e) => setRescheduleReason(e.target.value)}
+                  placeholder="e.g. Patient requested morning slot, Doctor emergency..."
+                  className="w-full px-3.5 py-2.5 rounded-xl text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsRescheduleModalOpen(false)}
+                  className="px-4 py-2.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex items-center gap-2 px-6 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md shadow-blue-500/25 transition-all cursor-pointer"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Confirm & Save Reschedule</span>
+                </button>
+              </div>
+
+            </form>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
+
