@@ -20,7 +20,9 @@ import {
   Sparkles,
   ChevronRight,
   ShieldAlert,
-  ExternalLink
+  ExternalLink,
+  Trash2,
+  Lock
 } from 'lucide-react';
 
 export default function PatientListAndRegistration({ isRegisterModalOpen, setIsRegisterModalOpen, onSelectPatient }) {
@@ -33,7 +35,8 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
     activeBranchId,
     activeBranch,
     branches,
-    generateBranchFileNumber
+    generateBranchFileNumber,
+    isSuperAdmin
   } = useApp();
 
   const [patients, setPatients] = useState([]);
@@ -41,6 +44,10 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
   const [filterGender, setFilterGender] = useState('ALL');
   const [filterBranch, setFilterBranch] = useState('ALL');
   const [isReadingCard, setIsReadingCard] = useState(false);
+
+  // Super Admin Delete Patient State
+  const [patientToDelete, setPatientToDelete] = useState(null);
+  const [isDeletingPatient, setIsDeletingPatient] = useState(false);
 
   // Form State for Patient Registration
   const [formHomeBranchId, setFormHomeBranchId] = useState(activeBranchId || 'branch-mnm');
@@ -280,6 +287,51 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
     loadPatients();
   };
 
+  // Super Admin Cascade Purge: Delete Patient and ALL associated history (Appointments, Vitals, Attachments)
+  const handleConfirmDeletePatient = async () => {
+    if (!patientToDelete || !isSuperAdmin) return;
+    const targetId = patientToDelete.id;
+    const targetName = patientToDelete.full_name_en;
+    const targetFile = patientToDelete.file_number;
+
+    setIsDeletingPatient(true);
+    try {
+      // 1. Delete all appointments of this patient
+      const patientAppointments = await db.appointments.where('patient_id').equals(targetId).toArray();
+      for (const appt of patientAppointments) {
+        await db.appointments.delete(appt.id);
+        await syncEngine.queueChange('appointments', appt.id, 'DELETE', { id: appt.id });
+      }
+
+      // 2. Delete all vitals records of this patient
+      const patientVitals = await db.vitals.where('patient_id').equals(targetId).toArray();
+      for (const v of patientVitals) {
+        await db.vitals.delete(v.id);
+        await syncEngine.queueChange('vitals', v.id, 'DELETE', { id: v.id });
+      }
+
+      // 3. Delete all attachments & X-Rays of this patient
+      const patientAttachments = await db.attachments.where('patient_id').equals(targetId).toArray();
+      for (const att of patientAttachments) {
+        await db.attachments.delete(att.id);
+        await syncEngine.queueChange('attachments', att.id, 'DELETE', { id: att.id });
+      }
+
+      // 4. Delete patient record
+      await db.patients.delete(targetId);
+      await syncEngine.queueChange('patients', targetId, 'DELETE', { id: targetId });
+
+      showToast(`Super Admin Action: Patient "${targetName}" (${targetFile}) & all associated clinical records (appointments, vitals, attachments) have been permanently purged.`, 'info', 6000);
+      setPatientToDelete(null);
+      loadPatients();
+    } catch (err) {
+      console.error('Failed to purge patient records:', err);
+      showToast('Error deleting patient records: ' + err.message, 'error');
+    } finally {
+      setIsDeletingPatient(false);
+    }
+  };
+
   // Handle Photo Upload
   const handlePhotoUpload = (e) => {
     const file = e.target.files[0];
@@ -486,8 +538,25 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
 
               {/* Bottom Actions */}
               <div className="pt-3 flex items-center justify-between text-xs font-semibold text-blue-600 dark:text-blue-400 border-t border-slate-100 dark:border-slate-800">
-                <span>View Full File & Clinical Vitals</span>
-                <ChevronRight className="w-4 h-4" />
+                <span className="flex items-center gap-1">
+                  <span>View Full File & Clinical Vitals</span>
+                  <ChevronRight className="w-4 h-4" />
+                </span>
+
+                {/* Super Admin Only: Delete Patient Button */}
+                {isSuperAdmin && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPatientToDelete(patient);
+                    }}
+                    className="p-1.5 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition cursor-pointer shrink-0"
+                    title="Super Admin Only: Delete Patient & Purge All Records"
+                  >
+                    <Trash2 className="w-4 h-4 text-rose-500 hover:text-rose-600" />
+                  </button>
+                )}
               </div>
 
             </div>
@@ -926,6 +995,92 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
               </div>
 
             </form>
+
+          </div>
+        </div>
+      )}
+
+      {/* SUPER ADMIN CONFIRMATION MODAL: DELETE PATIENT & PURGE ALL HISTORY */}
+      {patientToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 backdrop-blur-md p-4 animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-rose-200 dark:border-rose-900/60 animate-scaleUp">
+            
+            {/* Top Super Admin Privilege Badge */}
+            <div className="flex items-center justify-between pb-3 border-b border-rose-100 dark:border-rose-950">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 text-[10px] font-black uppercase tracking-wider border border-rose-200 dark:border-rose-800">
+                👑 Super Admin Authorization Required
+              </span>
+              <button
+                type="button"
+                onClick={() => !isDeletingPatient && setPatientToDelete(null)}
+                className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="text-center my-4">
+              <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-900 flex items-center justify-center text-rose-600 dark:text-rose-400 shadow-inner">
+                <Trash2 className="w-7 h-7 animate-bounce" />
+              </div>
+
+              <h3 className="font-extrabold text-lg sm:text-xl text-slate-900 dark:text-white">
+                Purge Patient & All Clinical History?
+              </h3>
+
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                You are about to permanently delete this patient record and all linked clinical data.
+              </p>
+            </div>
+
+            {/* Target Patient Card */}
+            <div className="p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700 text-left my-4 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-sm text-slate-900 dark:text-white truncate">
+                  {patientToDelete.full_name_en}
+                </span>
+                <span className="px-2 py-0.5 rounded-lg bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-200 font-mono font-bold text-xs">
+                  {patientToDelete.file_number}
+                </span>
+              </div>
+              {patientToDelete.full_name_ar && (
+                <p className="text-xs text-slate-500 font-arabic">{patientToDelete.full_name_ar}</p>
+              )}
+              <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                <span>CPR: <strong className="text-slate-700 dark:text-slate-200">{patientToDelete.cpr_number || 'N/A'}</strong></span>
+                <span>•</span>
+                <span>Phone: <strong className="text-slate-700 dark:text-slate-200">{patientToDelete.phone}</strong></span>
+              </div>
+            </div>
+
+            {/* Irreversible Warning Box */}
+            <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 text-[11px] text-rose-800 dark:text-rose-300 flex items-start gap-2 mb-6">
+              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+              <div className="leading-relaxed">
+                <strong>Irreversible Action:</strong> Deleting this patient will permanently purge all associated <strong>Appointments, Vitals Recordings, Dental X-Rays, Lab Reports, and Invoices</strong> across all branch locations and MySQL sync databases.
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setPatientToDelete(null)}
+                disabled={isDeletingPatient}
+                className="flex-1 py-2.5 px-4 rounded-xl font-bold text-xs text-slate-700 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeletePatient}
+                disabled={isDeletingPatient}
+                className="flex-1 py-2.5 px-4 rounded-xl font-bold text-xs text-white bg-rose-600 hover:bg-rose-700 shadow-lg shadow-rose-600/25 transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>{isDeletingPatient ? 'Purging Records...' : 'Permanently Delete'}</span>
+              </button>
+            </div>
 
           </div>
         </div>

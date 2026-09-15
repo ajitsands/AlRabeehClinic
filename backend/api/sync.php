@@ -274,6 +274,12 @@ if ($method === 'POST' && $action === 'push') {
                         ':medical_alerts' => $payload['medical_alerts'] ?? null,
                         ':source' => $payload['source'] ?? 'CARD_READER'
                     ]);
+                } elseif ($operation === 'DELETE') {
+                    $stmt = $db->prepare("DELETE FROM patients WHERE id = :id");
+                    $stmt->execute([':id' => $payload['id']]);
+                    $db->prepare("DELETE FROM appointments WHERE patient_id = :id")->execute([':id' => $payload['id']]);
+                    $db->prepare("DELETE FROM patient_vitals WHERE patient_id = :id")->execute([':id' => $payload['id']]);
+                    $db->prepare("DELETE FROM patient_attachments WHERE patient_id = :id")->execute([':id' => $payload['id']]);
                 }
             } elseif ($entityType === 'appointments') {
                 if ($operation === 'INSERT' || $operation === 'UPDATE') {
@@ -309,9 +315,12 @@ if ($method === 'POST' && $action === 'push') {
                         ':notes' => $payload['notes'] ?? null,
                         ':estimated_fee' => $payload['estimated_fee'] ?? 0.000
                     ]);
+                } elseif ($operation === 'DELETE') {
+                    $stmt = $db->prepare("DELETE FROM appointments WHERE id = :id");
+                    $stmt->execute([':id' => $payload['id']]);
                 }
             } elseif ($entityType === 'vitals') {
-                if ($operation === 'INSERT') {
+                if ($operation === 'INSERT' || $operation === 'UPDATE') {
                     $stmt = $db->prepare("
                         INSERT INTO patient_vitals (id, patient_id, bp_systolic, bp_diastolic, pulse_bpm, temperature_c, spo2_percent, blood_sugar_mg, weight_kg, pain_scale, clinical_notes)
                         VALUES (:id, :patient_id, :bp_systolic, :bp_diastolic, :pulse_bpm, :temperature_c, :spo2_percent, :blood_sugar_mg, :weight_kg, :pain_scale, :clinical_notes)
@@ -329,9 +338,12 @@ if ($method === 'POST' && $action === 'push') {
                         ':pain_scale' => $payload['pain_scale'] ?? 0,
                         ':clinical_notes' => $payload['clinical_notes'] ?? null
                     ]);
+                } elseif ($operation === 'DELETE') {
+                    $stmt = $db->prepare("DELETE FROM patient_vitals WHERE id = :id");
+                    $stmt->execute([':id' => $payload['id']]);
                 }
             } elseif ($entityType === 'attachments') {
-                if ($operation === 'INSERT') {
+                if ($operation === 'INSERT' || $operation === 'UPDATE') {
                     $stmt = $db->prepare("
                         INSERT INTO patient_attachments (id, patient_id, appointment_id, file_name, original_name, category, file_size_bytes, mime_type, file_path, file_data_base64, notes)
                         VALUES (:id, :patient_id, :appointment_id, :file_name, :original_name, :category, :file_size_bytes, :mime_type, :file_path, :file_data_base64, :notes)
@@ -349,6 +361,9 @@ if ($method === 'POST' && $action === 'push') {
                         ':file_data_base64' => $payload['file_data_base64'] ?? null,
                         ':notes' => $payload['notes'] ?? null
                     ]);
+                } elseif ($operation === 'DELETE') {
+                    $stmt = $db->prepare("DELETE FROM patient_attachments WHERE id = :id");
+                    $stmt->execute([':id' => $payload['id']]);
                 }
             } elseif ($entityType === 'doctors') {
                 if ($operation === 'INSERT' || $operation === 'UPDATE') {
