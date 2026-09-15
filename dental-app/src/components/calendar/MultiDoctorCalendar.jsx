@@ -26,7 +26,11 @@ import {
   Move,
   CalendarSync,
   ArrowRight,
-  GripVertical
+  GripVertical,
+  AlertTriangle,
+  CalendarX,
+  HelpCircle,
+  RotateCcw
 } from 'lucide-react';
 
 export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen, setIsModalOpen, preselectedSlot, setPreselectedSlot }) {
@@ -61,6 +65,14 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
   const [rescheduleSlotCount, setRescheduleSlotCount] = useState(1);
   const [rescheduleDurationMins, setRescheduleDurationMins] = useState(30);
   const [rescheduleReason, setRescheduleReason] = useState('');
+
+  // Cancellation Questionnaire & Confirmation Modal State
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState(null);
+  const [cancelReasonCategory, setCancelReasonCategory] = useState('Patient Requested (Personal / Schedule Conflict)');
+  const [cancelCustomNote, setCancelCustomNote] = useState('');
+  const [cancelRescheduleAfter, setCancelRescheduleAfter] = useState(false);
+  const [cancelNotifyWhatsApp, setCancelNotifyWhatsApp] = useState(true);
 
   // Form State for New Booking
   const [bookingDoctorId, setBookingDoctorId] = useState('');
@@ -371,6 +383,51 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
       setSelectedDate(rescheduleDate);
     } else {
       loadData();
+    }
+  };
+
+  // --- CANCELLATION QUESTIONNAIRE & CONFIRMATION LOGIC ---
+  const handleOpenCancelModal = (appointment) => {
+    setCancelTarget(appointment);
+    setCancelReasonCategory('Patient Requested (Schedule Conflict / Personal Reason)');
+    setCancelCustomNote('');
+    setCancelRescheduleAfter(false);
+    setCancelNotifyWhatsApp(true);
+    setIsCancelModalOpen(true);
+    setActiveAppointment(null);
+  };
+
+  const handleConfirmCancel = async (e) => {
+    e.preventDefault();
+    if (!cancelTarget) return;
+
+    const fullReason = `${cancelReasonCategory}${cancelCustomNote ? ` — Details: ${cancelCustomNote}` : ''}`;
+    const logNote = `[CANCELLED on ${new Date().toLocaleDateString()}: ${fullReason}]`;
+    const updatedNotes = cancelTarget.notes ? `${cancelTarget.notes} | ${logNote}` : logNote;
+
+    const updatedData = {
+      status: 'CANCELLED',
+      cancellation_reason: fullReason,
+      cancelled_at: new Date().toISOString(),
+      notes: updatedNotes,
+      updated_at: new Date().toISOString()
+    };
+
+    await db.appointments.update(cancelTarget.id, updatedData);
+    const updated = await db.appointments.get(cancelTarget.id);
+    await syncEngine.queueChange('appointments', cancelTarget.id, 'UPDATE', updated);
+
+    const ptName = cancelTarget.patient?.full_name_en || 'Patient';
+    showToast(`Appointment for ${ptName} has been cancelled. Reason logged.`, 'info');
+
+    const appointmentToReschedule = cancelTarget;
+    setIsCancelModalOpen(false);
+    setCancelTarget(null);
+    loadData();
+
+    // If user selected to reschedule right after cancelling
+    if (cancelRescheduleAfter) {
+      handleOpenRescheduleModal(appointmentToReschedule);
     }
   };
 
@@ -1087,10 +1144,11 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
                     Completed
                   </button>
                   <button
-                    onClick={() => handleUpdateStatus(activeAppointment.id, 'CANCELLED')}
-                    className="px-2.5 py-2 rounded-xl font-bold bg-rose-100 dark:bg-rose-900/60 text-rose-800 dark:text-rose-200 hover:bg-rose-200 transition"
+                    onClick={() => handleOpenCancelModal(activeAppointment)}
+                    className="px-2.5 py-2 rounded-xl font-bold bg-rose-100 dark:bg-rose-900/60 text-rose-800 dark:text-rose-200 hover:bg-rose-200 transition flex items-center justify-center gap-1 cursor-pointer"
                   >
-                    Cancel
+                    <CalendarX className="w-3.5 h-3.5" />
+                    <span>Cancel</span>
                   </button>
                   <button
                     onClick={() => {
@@ -1345,7 +1403,148 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
         </div>
       )}
 
+      {/* CANCELLATION QUESTIONNAIRE & CONFIRMATION MODAL */}
+      {isCancelModalOpen && cancelTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/65 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-rose-200 dark:border-rose-950/80 max-h-[92vh] overflow-y-auto">
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3.5 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center border border-rose-200 dark:border-rose-900/50 shadow-sm">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base sm:text-lg text-slate-900 dark:text-white">
+                    Cancel Dental Appointment?
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Patient: <span className="font-bold text-slate-800 dark:text-slate-200">{cancelTarget.patient?.full_name_en || 'Patient'}</span>
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCancelModalOpen(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmCancel} className="space-y-4 mt-4">
+              
+              {/* Alert Notice */}
+              <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/40 text-xs">
+                <div className="flex items-start gap-2 text-rose-800 dark:text-rose-300 font-semibold leading-relaxed">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600 dark:text-rose-400" />
+                  <div>
+                    <span>Are you sure you want to cancel the booking for </span>
+                    <span className="font-bold underline">{cancelTarget.patient?.full_name_en}</span>
+                    <span> with </span>
+                    <span className="font-bold">{cancelTarget.doctor?.name}</span>
+                    <span> on </span>
+                    <span className="font-bold">{cancelTarget.appointment_date} at {cancelTarget.start_time}</span>?
+                    <p className="text-[11px] text-rose-600 dark:text-rose-400 font-normal mt-1">
+                      This will free up Chair {cancelTarget.doctor?.chair_number} for other patients. Please specify the reason below.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Question 1: Cancellation Reason */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                  <HelpCircle className="w-3.5 h-3.5 text-blue-500" />
+                  <span>1. Why is this appointment being cancelled?</span>
+                </label>
+                <div className="space-y-1.5">
+                  {[
+                    'Patient Requested (Schedule Conflict / Personal Reason)',
+                    'Patient Did Not Show Up (No-Show)',
+                    'Doctor Emergency / Doctor Unavailable',
+                    'Feeling Better / Treatment Postponed by Patient',
+                    'Financial / Insurance Coverage Concern',
+                    'Other Reason'
+                  ].map((reason) => (
+                    <label
+                      key={reason}
+                      className={`flex items-center gap-2.5 p-2.5 rounded-xl border text-xs font-semibold cursor-pointer transition ${
+                        cancelReasonCategory === reason
+                          ? 'bg-rose-50/80 dark:bg-rose-950/40 border-rose-300 dark:border-rose-800 text-rose-900 dark:text-rose-200'
+                          : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="cancelReason"
+                        value={reason}
+                        checked={cancelReasonCategory === reason}
+                        onChange={(e) => setCancelReasonCategory(e.target.value)}
+                        className="text-rose-600 focus:ring-rose-500 cursor-pointer"
+                      />
+                      <span>{reason}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Question 2: Specific Notes */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
+                  2. Additional Note or Remarks (Optional)
+                </label>
+                <textarea
+                  rows={2}
+                  value={cancelCustomNote}
+                  onChange={(e) => setCancelCustomNote(e.target.value)}
+                  placeholder="e.g. Patient called to postpone due to work travel; promised to call next Tuesday..."
+                  className="w-full px-3.5 py-2.5 rounded-xl text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-rose-500/20"
+                />
+              </div>
+
+              {/* Option: Immediately Reschedule After Cancellation */}
+              <div className="p-3 bg-blue-50/60 dark:bg-blue-950/30 rounded-2xl border border-blue-200/80 dark:border-blue-900/50">
+                <label className="flex items-center gap-2.5 text-xs font-bold text-blue-900 dark:text-blue-200 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={cancelRescheduleAfter}
+                    onChange={(e) => setCancelRescheduleAfter(e.target.checked)}
+                    className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                  />
+                  <div className="flex items-center gap-1.5">
+                    <RotateCcw className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                    <span>Immediately open Reschedule tool to book a replacement slot</span>
+                  </div>
+                </label>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsCancelModalOpen(false)}
+                  className="px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl cursor-pointer"
+                >
+                  No, Keep Appointment
+                </button>
+                <button
+                  type="submit"
+                  className="flex items-center gap-2 px-5 py-2.5 text-xs font-extrabold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md shadow-rose-600/25 transition cursor-pointer"
+                >
+                  <CalendarX className="w-4 h-4" />
+                  <span>Yes, Cancel Appointment</span>
+                </button>
+              </div>
+
+            </form>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
+
 
