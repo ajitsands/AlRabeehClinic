@@ -207,6 +207,7 @@ export default function SettingsView() {
   const [readerRestUrl, setReaderRestUrl] = useState(settings.reader_rest_url || 'http://localhost:5050/api/operation/ReadCard');
   
   const [testingReader, setTestingReader] = useState(false);
+  const [readerTestResult, setReaderTestResult] = useState(null);
   const [copiedKey, setCopiedKey] = useState(null);
 
   const handleCopy = (text, key, label) => {
@@ -275,12 +276,17 @@ export default function SettingsView() {
 
   const handleTestReader = async () => {
     setTestingReader(true);
+    setReaderTestResult(null);
     try {
-      const ok = await smartCardService.connect(readerWsUrl);
-      if (ok) {
-        showToast('Successfully connected to local Smart Card Reader service (Port 5060)', 'success');
+      const result = await smartCardService.testConnection({
+        wsUrl: readerWsUrl,
+        restUrl: readerRestUrl
+      });
+      setReaderTestResult(result);
+      if (result.overall) {
+        showToast(result.message, 'success', 6000);
       } else {
-        showToast('Local service connection failed. Please ensure SCardReadServer is running.', 'error');
+        showToast('Local service connection failed. Please ensure CIO GCC CardRead Server is running.', 'error', 6000);
       }
     } catch (err) {
       showToast(`Reader test failed: ${err.message}`, 'error');
@@ -1065,6 +1071,52 @@ export default function SettingsView() {
                 </button>
               </div>
             </div>
+
+            {/* Live Diagnostic Results Banner if tested */}
+            {readerTestResult && (
+              <div className={`p-4 rounded-2xl border text-xs space-y-2.5 transition-all ${
+                readerTestResult.overall
+                  ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-100'
+                  : 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-100'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {readerTestResult.overall ? (
+                      <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                    ) : (
+                      <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                    )}
+                    <span className="font-extrabold text-sm">
+                      {readerTestResult.overall 
+                        ? 'Smart Card Local Service is Operational & Ready' 
+                        : 'Local Service Connection Warning'}
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-mono opacity-70">
+                    Checked {new Date().toLocaleTimeString()}
+                  </span>
+                </div>
+
+                <p className="text-[11px] leading-relaxed">
+                  {readerTestResult.message}
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-emerald-200/60 dark:border-emerald-800/60 text-[11px]">
+                  <div className="flex items-center justify-between p-2 rounded-xl bg-white/70 dark:bg-slate-900/60">
+                    <span className="font-bold">REST API (Port 5050):</span>
+                    <span className={`font-extrabold ${readerTestResult.rest.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
+                      {readerTestResult.rest.ok ? '✓ Online & Ready' : '✗ Offline'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded-xl bg-white/70 dark:bg-slate-900/60">
+                    <span className="font-bold">WebSocket (Port 5060):</span>
+                    <span className={`font-extrabold ${readerTestResult.ws.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
+                      {readerTestResult.ws.ok ? '✓ Connected' : '○ Standby'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* 4-Step Installation & Setup Procedure */}
             <div>

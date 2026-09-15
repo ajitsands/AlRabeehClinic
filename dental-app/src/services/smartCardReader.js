@@ -113,12 +113,116 @@ class SmartCardReaderService {
     }
   }
 
-  // Trigger Smart Card Read via WebSocket or REST API fallback
+  // Comprehensive connection testing across REST (Port 5050) and WebSocket (Port 5060)
+  async testConnection(options = {}) {
+    const wsUrl = options.wsUrl || this.wsUrl;
+    const restUrl = options.restUrl || this.restUrl;
+    const results = {
+      rest: { ok: false, message: '', port: 5050 },
+      ws: { ok: false, message: '', port: 5060 },
+      overall: false,
+      hasCard: false,
+      message: '',
+      error: null
+    };
+
+    // 1. Test REST Service (Port 5050) - Primary & Most Reliable HTTP API in Bahrain CIO SDK
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      const res = await fetch(restUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          ReadCardInfo: true,
+          ReadPersonalInfo: true,
+          ReadAddressDetails: true,
+          ReadBiometrics: false,
+          ReadEmploymentInfo: false,
+          ReadImmigrationDetails: false,
+          ReadTrafficDetails: false,
+          SilentReading: false,
+          ReaderIndex: -1,
+          ReaderName: "",
+          OutputFormat: "JSON",
+          ValidateCard: false
+        }),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        const data = await res.json();
+        results.rest.ok = true;
+        if (data.CPR || data.IdNumber || data.EnglishFirstName || data.EnglishFullName) {
+          results.hasCard = true;
+          results.rest.message = `CPR Card detected & readable: ${data.EnglishFullName || data.CPR || data.IdNumber}`;
+        } else if (data.ErrorDescription && (data.ErrorDescription.includes('removed') || data.ErrorDescription.includes('smart card'))) {
+          results.rest.message = 'Service active & USB reader detected (Ready for card insertion)';
+        } else {
+          results.rest.message = data.ErrorDescription || 'REST service operational on port 5050';
+        }
+      } else {
+        results.rest.message = `HTTP ${res.status}`;
+      }
+    } catch (e) {
+      results.rest.ok = false;
+      results.rest.message = e.name === 'AbortError' ? 'REST endpoint timed out' : (e.message || 'REST offline');
+    }
+
+    // 2. Test WebSocket Service (Port 5060)
+    try {
+      const wsConnected = await this.connect(wsUrl);
+      results.ws.ok = wsConnected;
+      results.ws.message = wsConnected ? 'WebSocket active on port 5060' : 'WebSocket port 5060 not answering';
+    } catch (e) {
+      results.ws.ok = false;
+      results.ws.message = e.message || 'WebSocket offline';
+    }
+
+    results.overall = results.rest.ok || results.ws.ok;
+    
+    if (results.overall) {
+      this.isConnected = true;
+      this.emit('connectionChange', { status: 'CONNECTED', url: results.rest.ok ? restUrl : wsUrl });
+      results.message = results.hasCard 
+        ? `Smart Card Reader Connected! Card found: ${results.rest.message}`
+        : `Smart Card Service is ACTIVE & Running! (Port 5050 REST: Ready. Insert card to scan)`;
+    } else {
+      this.isConnected = false;
+      this.emit('connectionChange', { status: 'DISCONNECTED' });
+      results.message = 'Could not connect to SCardReadServer on localhost. Please make sure the CIO GCC CardRead Server service is started.';
+    }
+
+    return results;
+  }
+
+  // Trigger Smart Card Read via REST API (primary) or WebSocket fallback
   async readSmartCard(options = {}) {
     this.isReading = true;
     this.emit('readingStart');
 
-    // 1. Try via WebSocket if active
+    // 1. First attempt direct REST API (Port 5050) as it is the most reliable
+    try {
+      const restResult = await this.readViaRest(options);
+      this.isReading = false;
+      this.emit('readSuccess', restResult);
+      return restResult;
+    } catch (restErr) {
+      console.log('REST read attempt notice:', restErr.message);
+
+      // If REST threw because no card was in the slot, propagate that specific error
+      if (restErr.message.includes('card has been removed') || restErr.message.includes('no card')) {
+        this.isReading = false;
+        this.emit('readError', restErr);
+        throw new Error('Smart Card Reader is active, but no card was detected. Please insert the patient\'s CPR chip card firmly into the reader.');
+      }
+    }
+
+    // 2. Try via WebSocket if active
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       const payload = "ReadCard" + JSON.stringify({
         ReadCardInfo: true,
@@ -137,7 +241,6 @@ class SmartCardReaderService {
 
       this.ws.send(payload);
 
-      // Return a promise with timeout for WebSocket response
       return new Promise((resolve, reject) => {
         const cleanup = () => {
           this.off('readSuccess', onReadSuccess);
@@ -158,34 +261,22 @@ class SmartCardReaderService {
         this.on('readSuccess', onReadSuccess);
         this.on('readError', onReadError);
 
-        // 10 second timeout fallback to REST or Simulator
-        setTimeout(async () => {
+        setTimeout(() => {
           cleanup();
-          try {
-            const restResult = await this.readViaRest(options);
-            resolve(restResult);
-          } catch (restErr) {
-            reject(new Error('Card reading timed out or no card detected in reader.'));
-          }
+          reject(new Error('Card reading timed out. Please ensure CPR card is properly inserted in the reader.'));
         }, 8000);
       });
     }
 
-    // 2. Fallback to RESTful service if WS not active
-    try {
-      const restResult = await this.readViaRest(options);
-      this.isReading = false;
-      this.emit('readSuccess', restResult);
-      return restResult;
-    } catch (err) {
-      this.isReading = false;
-      this.emit('readError', err);
-      throw err;
-    }
+    this.isReading = false;
+    const err = new Error('Smart Card Reader service not reachable or no card inserted.');
+    this.emit('readError', err);
+    throw err;
   }
 
   async readViaRest(options = {}) {
-    const response = await fetch(options.restUrl || this.restUrl, {
+    const targetUrl = options.restUrl || this.restUrl;
+    const response = await fetch(targetUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -208,10 +299,16 @@ class SmartCardReaderService {
     });
 
     if (!response.ok) {
-      throw new Error(`REST reader service returned status: ${response.status}`);
+      throw new Error(`REST reader service returned HTTP status: ${response.status}`);
     }
 
     const json = await response.json();
+
+    // If server returned an error description with empty cardholder fields
+    if (json.ErrorDescription && !json.CPR && !json.IdNumber && !json.EnglishFirstName && !json.EnglishFullName) {
+      throw new Error(json.ErrorDescription);
+    }
+
     return this.parseCardPayload(json);
   }
 
