@@ -423,41 +423,45 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
           <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-5xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 dark:border-slate-800 max-h-[94vh] overflow-y-auto">
             
             {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800 gap-3">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800 gap-4">
+              
+              {/* Left: Icon, Title, Subtitle, and Registering Branch Selector right below the Title */}
+              <div className="flex items-start gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
                   <Users className="w-6 h-6" />
                 </div>
-                <div>
-                  <h3 className="font-extrabold text-xl text-slate-900 dark:text-white">
-                    Patient Registration & CPR Intake
-                  </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Register new customer file and synchronize with clinic records
-                  </p>
+                <div className="space-y-2">
+                  <div>
+                    <h3 className="font-extrabold text-xl text-slate-900 dark:text-white">
+                      Patient Registration & CPR Intake
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Register new customer file and synchronize with clinic records
+                    </p>
+                  </div>
+
+                  {/* Registering Branch - Positioned directly below the Title */}
+                  <div className="flex items-center gap-2 pt-0.5">
+                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                      Registering Branch:
+                    </span>
+                    <select
+                      value={formHomeBranchId}
+                      onChange={(e) => handleBranchChangeInForm(e.target.value)}
+                      className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200/80 dark:hover:bg-slate-750 text-slate-800 dark:text-slate-100 text-xs font-bold py-1 px-3 rounded-xl border border-slate-300 dark:border-slate-700 cursor-pointer focus:ring-2 focus:ring-blue-500 transition shadow-2xs"
+                    >
+                      {branches.map(b => (
+                        <option key={b.id} value={b.id}>
+                          📍 {b.name.replace('Al Rabeesh ', '')} ({b.prefix})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
 
-              {/* Prominent Large File Number Badge & Branch Selector */}
-              <div className="flex items-center gap-3 self-end sm:self-auto">
-                {/* Branch Selection Dropdown */}
-                <div className="flex flex-col">
-                  <label className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-0.5">
-                    Registering Branch
-                  </label>
-                  <select
-                    value={formHomeBranchId}
-                    onChange={(e) => handleBranchChangeInForm(e.target.value)}
-                    className="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-xs font-bold py-1.5 px-3 rounded-xl border border-slate-300 dark:border-slate-700 cursor-pointer focus:ring-2 focus:ring-blue-500"
-                  >
-                    {branches.map(b => (
-                      <option key={b.id} value={b.id}>
-                        📍 {b.name.replace('Al Rabeesh ', '')} ({b.prefix})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
+              {/* Right: Prominent File ID Badge & Close Button */}
+              <div className="flex items-center gap-3 self-end sm:self-center">
                 <div className="flex flex-col sm:items-end">
                   <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 dark:text-slate-500">
                     Patient File ID
@@ -476,6 +480,7 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
                   <X className="w-6 h-6" />
                 </button>
               </div>
+
             </div>
 
             {/* Smart Card Quick-Autofill Banner */}
