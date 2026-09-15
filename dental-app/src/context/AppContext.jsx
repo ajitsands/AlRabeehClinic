@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { db, initializeDatabase } from '../db/indexedDB';
+import { db, initializeDatabase, seedFreshMultiBranchData } from '../db/indexedDB';
 import { smartCardService } from '../services/smartCardReader';
 import { syncEngine } from '../services/syncEngine';
 
@@ -246,6 +246,33 @@ export function AppProvider({ children }) {
     }
   };
 
+  // 1-Click Database Reset to Fresh Multi-Branch Demo Data
+  const resetToFreshDemoData = async () => {
+    try {
+      await seedFreshMultiBranchData();
+      await refreshBranches();
+      await refreshUsers();
+      const savedSettings = await db.settings.get('clinic_settings');
+      if (savedSettings) {
+        setSettings(savedSettings);
+        setTheme(savedSettings.theme || 'light');
+      }
+      setActiveBranchIdState('branch-mnm');
+      setCurrentUser({
+        id: 'usr-superadmin',
+        username: 'superadmin',
+        full_name: 'Dr. Tariq Al Rabeesh (Executive Director)',
+        role: 'SUPER_ADMIN',
+        branch_id: null
+      });
+      showToast('Database reset! Fresh multi-branch demo data loaded successfully.', 'success');
+      return true;
+    } catch (err) {
+      showToast(`Database reset failed: ${err.message}`, 'error');
+      return false;
+    }
+  };
+
   // Initialize DB, Load Settings, Users and Branches
   useEffect(() => {
     async function setup() {
@@ -452,6 +479,7 @@ export function AppProvider({ children }) {
         testConnection: (url) => syncEngine.testConnection(url),
         getPendingSyncItems: () => syncEngine.getPendingItems(),
         syncEngine,
+        resetToFreshDemoData,
         toast,
         showToast,
         formatCurrency,

@@ -16,7 +16,9 @@ import {
   Phone,
   Hash,
   Filter,
-  Plus
+  Plus,
+  RefreshCw,
+  AlertTriangle
 } from 'lucide-react';
 
 export default function BranchesAndUsersView() {
@@ -29,9 +31,13 @@ export default function BranchesAndUsersView() {
     currentUser, 
     loginAsUser, 
     saveUser, 
-    isSuperAdmin, 
+    isSuperAdmin,
+    resetToFreshDemoData, 
     showToast 
   } = useApp();
+
+  const [isResetting, setIsResetting] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   // Multi-Branch State
   const [editingBranch, setEditingBranch] = useState(null);
@@ -228,6 +234,17 @@ export default function BranchesAndUsersView() {
             >
               <UserPlus className="w-3.5 h-3.5" />
               <span>Add Staff</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowResetConfirm(true)}
+              disabled={isResetting}
+              className="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 font-bold text-xs border border-rose-300 dark:border-rose-800 flex items-center gap-1.5 shadow-2xs transition cursor-pointer"
+              title="Reset all demo data to fresh clean multi-branch state"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isResetting ? 'animate-spin' : ''}`} />
+              <span>Reset Demo Data</span>
             </button>
           </div>
         </div>
@@ -732,6 +749,60 @@ export default function BranchesAndUsersView() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* RESET CONFIRMATION MODAL */}
+      {showResetConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-md w-full p-6 shadow-2xl border border-rose-200 dark:border-rose-900/60 space-y-4">
+            <div className="flex items-center gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div className="w-10 h-10 rounded-2xl bg-rose-100 dark:bg-rose-900/40 text-rose-600 flex items-center justify-center">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
+                  Reset to Fresh Demo Data?
+                </h3>
+                <p className="text-xs text-slate-500">
+                  This will reload clean multi-branch records across all 4 branches.
+                </p>
+              </div>
+            </div>
+
+            <div className="text-xs text-slate-600 dark:text-slate-300 space-y-2 leading-relaxed">
+              <p>You will get clean, organized demo data containing:</p>
+              <ul className="list-disc list-inside space-y-1 text-[11px] font-medium text-slate-700 dark:text-slate-300">
+                <li><strong className="text-slate-900 dark:text-white">4 Branches:</strong> Manama, Riffa, Seef, Muharraq</li>
+                <li><strong className="text-slate-900 dark:text-white">8 Doctors:</strong> 2 dedicated specialists per branch</li>
+                <li><strong className="text-slate-900 dark:text-white">13 Staff Accounts:</strong> Super Admin, Branch Admins, Receptionists</li>
+                <li><strong className="text-slate-900 dark:text-white">8 Sample Patients:</strong> With unique branch file numbers (ARB-MNM, ARB-RFA, etc.)</li>
+                <li><strong className="text-slate-900 dark:text-white">Today's Schedule:</strong> Realistic bookings on each branch's chairs</li>
+              </ul>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setShowResetConfirm(false)}
+                className="px-4 py-2 font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setIsResetting(true);
+                  setShowResetConfirm(false);
+                  await resetToFreshDemoData();
+                  setIsResetting(false);
+                }}
+                className="px-5 py-2 font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow-md shadow-rose-500/20 cursor-pointer"
+              >
+                Yes, Reset Database Now
+              </button>
+            </div>
           </div>
         </div>
       )}
