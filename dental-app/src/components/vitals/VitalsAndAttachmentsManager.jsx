@@ -1641,23 +1641,39 @@ export default function VitalsAndAttachmentsManager({ activePatientId, onBackToL
                     <>
                       <span className="hidden sm:inline">•</span>
                       <span className="hidden sm:inline text-blue-600 dark:text-blue-400 font-medium">
-                        💡 Scroll wheel to zoom • Drag to pan • Double click to zoom in
+                        💡 Scroll wheel to zoom • Drag to pan • Click presets to adjust
                       </span>
                     </>
                   )}
                   {fileType === 'pdf' && (
                     <>
                       <span className="hidden sm:inline">•</span>
-                      <span className="hidden sm:inline text-rose-600 dark:text-rose-400 font-medium">
-                        📄 Interactive PDF Reader with page navigation & search
+                      <span className="hidden sm:inline text-rose-600 dark:text-rose-400 font-semibold animate-pulse">
+                        💡 Click on [Full Screen] ⛶ for Maximized Clinical Examination
                       </span>
                     </>
                   )}
                   {fileType === 'excel' && (
                     <>
                       <span className="hidden sm:inline">•</span>
-                      <span className="hidden sm:inline text-emerald-600 dark:text-emerald-400 font-medium">
-                        📊 Clinical Spreadsheet with row & column inspection
+                      <span className="hidden sm:inline text-emerald-600 dark:text-emerald-400 font-semibold">
+                        💡 Click on [Full Screen] ⛶ for Expanded Spreadsheet Grid View
+                      </span>
+                    </>
+                  )}
+                  {fileType === 'word' && (
+                    <>
+                      <span className="hidden sm:inline">•</span>
+                      <span className="hidden sm:inline text-blue-600 dark:text-blue-400 font-semibold">
+                        💡 Click on [Full Screen] ⛶ for Expanded Document View
+                      </span>
+                    </>
+                  )}
+                  {fileType === 'text' && (
+                    <>
+                      <span className="hidden sm:inline">•</span>
+                      <span className="hidden sm:inline text-indigo-600 dark:text-indigo-400 font-semibold">
+                        💡 Click on [Full Screen] ⛶ for Expanded Inspector View
                       </span>
                     </>
                   )}
