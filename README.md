@@ -22,8 +22,10 @@ Comprehensive, offline-first Dental Practice Management System integrated with B
    - Multi-field search by CPR, Mobile, Arabic/English Name, or File ID (`PAT-2026-XXXX`).
    - Auto-generated sequential File IDs and 4-cards-per-row responsive grid.
 
-4. **🩺 Clinical Vitals Tracker & File Attachments (Up to 100MB)**
+4. **🩺 Clinical Vitals Tracker, Voice Dictation & File Attachments (Up to 100MB)**
    - Records BP, Pulse, Temperature, SpO2, Blood Sugar, Weight, and Visual Dental Pain Scale (0-10).
+   - **🎙️ AI Voice Dictation**: Real-time microphone speech-to-text powered by Web Speech API, allowing doctors to speak and automatically type clinical notes hands-free.
+   - **Widened 3-Column Modal**: Ergonomic layout optimized for quick logging.
    - Supports uploading and previewing high-res OPG X-Rays, Intraoral photos, CBCT scans, and PDF reports.
 
 5. **⚙️ Regional Localization (Gulf & India)**

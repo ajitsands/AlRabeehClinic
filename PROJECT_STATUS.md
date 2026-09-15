@@ -89,6 +89,25 @@
   - MySQL `branches` table, `home_branch_id` / `created_at_branch_id` on `patients`, `branch_id` on `appointments`, and `primary_branch_id` on `doctors`.
   - Bidirectional sync handlers in `sync.php` with foreign-key-check resilience during bulk syncs.
 
+### ✅ I. AI Speech-to-Text & Voice Dictation Engine (Clinical Notes & Vitals)
+- **Speech Engine Architecture**:
+  - Utilizes the browser-native **W3C Web Speech API** (`window.SpeechRecognition` / `window.webkitSpeechRecognition`).
+  - **Browser Providers**:
+    - **Google Chrome / Microsoft Edge / Brave**: Powered by Google & Microsoft cloud-accelerated neural speech recognition models.
+    - **Safari / macOS / iOS**: Powered by Apple's on-device Siri neural speech recognition engine.
+- **Key Technical Configuration**:
+  - `continuous: true`: Allows doctors to speak continuously for prolonged clinical examinations without unexpected audio timeouts.
+  - `interimResults: true`: Real-time streaming transcription rendering spoken words into the textarea dynamically as the doctor speaks.
+  - `lang: 'en-US'`: Default clinical English dictation with support for localized accents and medical terminology.
+- **Architectural Advantages**:
+  - 💰 **100% Free & Zero Subscription Costs**: No external paid API keys or tokens required (e.g. no OpenAI Whisper API or Google Cloud STT bills).
+  - ⚡ **Zero Client-Side Model Bloat**: Does not require downloading massive multi-hundred megabyte local models.
+  - 🎙️ **Live Visual Feedback**: Includes real-time animated equalizer soundwaves, glowing recording badge, and clear start/stop/clear controls.
+  - 🔒 **Privacy & Safety**: Operates through standard user-permitted browser microphone APIs; automatically disconnects and cleans up memory on modal close, unmount, or vitals save.
+- **Widened Patient Vitals Modal Window**:
+  - Modal container widened from `max-w-lg` (~512px) to **`max-w-3xl` (~768px)** with responsive padding (`sm:p-7`).
+  - Organized vital sign cards into a **3-column responsive grid** (BP, Pulse, SpO2, Temperature, Blood Sugar, Weight, Pain Scale, and Charting Notes).
+
 ---
 
 ## 🔐 2. Server & Database Credentials Reference
