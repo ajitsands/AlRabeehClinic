@@ -42,20 +42,31 @@ VALUES
     ('branch-muh', 'Al Rabeesh Muharraq Branch', 'MUH', 'ARB-MUH', 'Road 2104, Block 221, Muharraq', '+973 1734 1122', '#F59E0B', 1)
 ON DUPLICATE KEY UPDATE `name` = VALUES(`name`);
 
--- 3. Users & Staff Roles Table
+-- 3. Users & Staff Roles Table (Multi-Branch Access Control)
 CREATE TABLE IF NOT EXISTS `users` (
     `id` VARCHAR(36) PRIMARY KEY,
     `username` VARCHAR(50) UNIQUE NOT NULL,
-    `password_hash` VARCHAR(255) NOT NULL,
+    `password_hash` VARCHAR(255) NOT NULL DEFAULT 'demo123',
     `full_name` VARCHAR(100) NOT NULL,
     `branch_id` VARCHAR(50) NULL,
-    `role` ENUM('ADMIN', 'DOCTOR', 'RECEPTIONIST', 'NURSE') NOT NULL DEFAULT 'RECEPTIONIST',
+    `role` ENUM('SUPER_ADMIN', 'BRANCH_ADMIN', 'DOCTOR', 'RECEPTIONIST', 'ADMIN', 'NURSE') NOT NULL DEFAULT 'RECEPTIONIST',
     `email` VARCHAR(100) NULL,
     `phone` VARCHAR(20) NULL,
     `is_active` TINYINT(1) NOT NULL DEFAULT 1,
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
+
+-- Seed Default Multi-Branch Users & Staff
+INSERT INTO `users` (`id`, `username`, `password_hash`, `full_name`, `role`, `branch_id`, `is_active`)
+VALUES
+    ('usr-superadmin', 'superadmin', 'admin123', 'Dr. Al Rabeesh (Executive Director)', 'SUPER_ADMIN', NULL, 1),
+    ('usr-admin-manama', 'admin_manama', 'admin123', 'Fatima Al-Sayed (Manama Branch Admin)', 'BRANCH_ADMIN', 'branch-mnm', 1),
+    ('usr-admin-riffa', 'admin_riffa', 'admin123', 'Khalid Al-Dosari (Riffa Branch Admin)', 'BRANCH_ADMIN', 'branch-rfa', 1),
+    ('usr-admin-seef', 'admin_seef', 'admin123', 'Mariam Bucheeri (Seef Branch Admin)', 'BRANCH_ADMIN', 'branch-sef', 1),
+    ('usr-admin-muharraq', 'admin_muharraq', 'admin123', 'Zainab Al-Majed (Muharraq Branch Admin)', 'BRANCH_ADMIN', 'branch-muh', 1)
+ON DUPLICATE KEY UPDATE `full_name` = VALUES(`full_name`), `role` = VALUES(`role`), `branch_id` = VALUES(`branch_id`);
+
 
 -- 4. Doctors Table
 CREATE TABLE IF NOT EXISTS `doctors` (

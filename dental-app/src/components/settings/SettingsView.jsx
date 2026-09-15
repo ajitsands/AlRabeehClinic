@@ -21,7 +21,11 @@ import {
   Copy,
   Check,
   HelpCircle,
-  Sliders
+  Sliders,
+  Users,
+  UserPlus,
+  Key,
+  Shield
 } from 'lucide-react';
 
 const REGIONAL_PRESETS = [
@@ -97,6 +101,11 @@ export default function SettingsView() {
     activeBranchId,
     setActiveBranchId,
     saveBranch,
+    users,
+    currentUser,
+    loginAsUser,
+    saveUser,
+    isSuperAdmin,
     showToast 
   } = useApp();
 
@@ -114,6 +123,55 @@ export default function SettingsView() {
   const [branchFormAddress, setBranchFormAddress] = useState('');
   const [branchFormPhone, setBranchFormPhone] = useState('');
   const [branchFormColor, setBranchFormColor] = useState('#2563EB');
+
+  // Staff & User Management State
+  const [userModalOpen, setUserModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [userFormFullName, setUserFormFullName] = useState('');
+  const [userFormUsername, setUserFormUsername] = useState('');
+  const [userFormRole, setUserFormRole] = useState('BRANCH_ADMIN');
+  const [userFormBranchId, setUserFormBranchId] = useState('branch-manama');
+  const [userFormActive, setUserFormActive] = useState(true);
+
+  const handleOpenUserModal = (u = null) => {
+    if (u) {
+      setEditingUser(u);
+      setUserFormFullName(u.full_name || '');
+      setUserFormUsername(u.username || '');
+      setUserFormRole(u.role || 'BRANCH_ADMIN');
+      setUserFormBranchId(u.branch_id || 'branch-manama');
+      setUserFormActive(u.is_active !== false);
+    } else {
+      setEditingUser(null);
+      setUserFormFullName('');
+      setUserFormUsername('');
+      setUserFormRole('BRANCH_ADMIN');
+      setUserFormBranchId(activeBranchId || 'branch-manama');
+      setUserFormActive(true);
+    }
+    setUserModalOpen(true);
+  };
+
+  const handleSaveUser = async (e) => {
+    e.preventDefault();
+    if (!userFormFullName || !userFormUsername) {
+      showToast('Please provide full name and username', 'error');
+      return;
+    }
+
+    const userData = {
+      id: editingUser ? editingUser.id : `usr-${userFormUsername.toLowerCase().replace(/[^a-z0-9]/g, '')}`,
+      username: userFormUsername.toLowerCase().trim(),
+      full_name: userFormFullName.trim(),
+      role: userFormRole,
+      branch_id: userFormRole === 'SUPER_ADMIN' ? null : userFormBranchId,
+      is_active: userFormActive,
+      updated_at: new Date().toISOString()
+    };
+
+    await saveUser(userData);
+    setUserModalOpen(false);
+  };
 
   const handleOpenBranchModal = (br = null) => {
     if (br) {
@@ -406,6 +464,122 @@ export default function SettingsView() {
                     type="button"
                     onClick={() => handleOpenBranchModal(b)}
                     className="text-[10px] font-bold text-slate-600 dark:text-slate-300 hover:text-slate-900 bg-white dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer"
+                  >
+                    Edit
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 0.5 STAFF ACCOUNTS & BRANCH ROLE MANAGEMENT */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+              <Users className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="font-extrabold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                <span>Staff Accounts & Branch Role Access</span>
+                <span className="px-2 py-0.5 text-[10px] font-bold bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 rounded-full">
+                  {users?.length || 0} Staff
+                </span>
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Manage Super Admin (Global Access), Branch Admins, Receptionists, and Doctors across all clinic branches
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => handleOpenUserModal()}
+            className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm self-end sm:self-auto cursor-pointer"
+          >
+            <UserPlus className="w-3.5 h-3.5" />
+            <span>+ Add Staff Member</span>
+          </button>
+        </div>
+
+        {/* Staff Table / Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {users?.map(u => {
+            const isMe = currentUser?.id === u.id;
+            const branchObj = branches.find(b => b.id === u.branch_id);
+            const roleBadgeClass = {
+              SUPER_ADMIN: 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border-rose-200 dark:border-rose-900',
+              BRANCH_ADMIN: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border-indigo-200 dark:border-indigo-900',
+              DOCTOR: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900',
+              RECEPTIONIST: 'bg-sky-100 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300 border-sky-200 dark:border-sky-900',
+            }[u.role] || 'bg-slate-100 text-slate-700 border-slate-200';
+
+            return (
+              <div
+                key={u.id}
+                className={`p-3.5 rounded-2xl border transition-all flex flex-col justify-between ${
+                  isMe
+                    ? 'border-indigo-500 bg-indigo-50/40 dark:bg-indigo-950/30 ring-1 ring-indigo-500/20 shadow-xs'
+                    : 'border-slate-200 dark:border-slate-700/80 bg-slate-50/40 dark:bg-slate-800/40'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-1.5 mb-1.5">
+                    <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border ${roleBadgeClass}`}>
+                      {u.role.replace('_', ' ')}
+                    </span>
+                    {isMe ? (
+                      <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-indigo-600 text-white shadow-xs">
+                        Active Logged In
+                      </span>
+                    ) : (
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${u.is_active ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
+                        {u.is_active ? '● Active' : '○ Inactive'}
+                      </span>
+                    )}
+                  </div>
+
+                  <h4 className="font-extrabold text-xs text-slate-900 dark:text-white truncate">
+                    {u.full_name}
+                  </h4>
+                  <p className="text-[11px] font-mono text-slate-500 dark:text-slate-400 mt-0.5">
+                    @{u.username}
+                  </p>
+
+                  <div className="mt-2 text-[11px] flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
+                    <Building className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span className="truncate">
+                      {u.role === 'SUPER_ADMIN' ? (
+                        <span className="font-bold text-rose-600 dark:text-rose-400">All Clinic Branches (Global)</span>
+                      ) : branchObj ? (
+                        <span>{branchObj.name} ({branchObj.code})</span>
+                      ) : (
+                        <span className="text-slate-400">Unassigned</span>
+                      )}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-3 pt-2 border-t border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between">
+                  {!isMe ? (
+                    <button
+                      type="button"
+                      onClick={() => loginAsUser(u.id)}
+                      className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer flex items-center gap-1"
+                    >
+                      <span>Switch to this user</span>
+                    </button>
+                  ) : (
+                    <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400">
+                      Current User
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleOpenUserModal(u)}
+                    className="text-[10px] font-bold text-slate-600 dark:text-slate-300 hover:text-slate-900 bg-white dark:bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer"
                   >
                     Edit
                   </button>
@@ -1194,6 +1368,129 @@ export default function SettingsView() {
                 className="px-5 py-2 font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-xs cursor-pointer"
               >
                 Save Branch
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    )}
+
+    {/* USER CREATE / EDIT MODAL */}
+    {userModalOpen && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+        <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+            <div className="flex items-center gap-2">
+              <Shield className="w-5 h-5 text-indigo-600" />
+              <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
+                {editingUser ? 'Edit Staff Account' : 'Add New Staff Member'}
+              </h3>
+            </div>
+            <button
+              type="button"
+              onClick={() => setUserModalOpen(false)}
+              className="p-1.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+
+          <form onSubmit={handleSaveUser} className="space-y-3 text-xs">
+            <div>
+              <label className="block font-bold uppercase text-slate-600 dark:text-slate-300 mb-1">
+                Full Name *
+              </label>
+              <input
+                type="text"
+                required
+                value={userFormFullName}
+                onChange={(e) => setUserFormFullName(e.target.value)}
+                placeholder="e.g. Dr. Salman Al-Khalifa"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border rounded-xl font-bold text-slate-900 dark:text-white"
+              />
+            </div>
+
+            <div>
+              <label className="block font-bold uppercase text-slate-600 dark:text-slate-300 mb-1">
+                Username / Login ID *
+              </label>
+              <input
+                type="text"
+                required
+                value={userFormUsername}
+                onChange={(e) => setUserFormUsername(e.target.value)}
+                placeholder="e.g. salman.khalifa"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border rounded-xl font-mono font-bold text-slate-900 dark:text-white"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block font-bold uppercase text-slate-600 dark:text-slate-300 mb-1">
+                  Access Role *
+                </label>
+                <select
+                  value={userFormRole}
+                  onChange={(e) => setUserFormRole(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border rounded-xl font-bold text-slate-900 dark:text-white cursor-pointer"
+                >
+                  <option value="SUPER_ADMIN">👑 Super Admin (All Branches)</option>
+                  <option value="BRANCH_ADMIN">🏢 Branch Admin</option>
+                  <option value="DOCTOR">🩺 Doctor / Specialist</option>
+                  <option value="RECEPTIONIST">📋 Receptionist</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold uppercase text-slate-600 dark:text-slate-300 mb-1">
+                  Assigned Branch {userFormRole === 'SUPER_ADMIN' ? '(Global)' : '*'}
+                </label>
+                <select
+                  disabled={userFormRole === 'SUPER_ADMIN'}
+                  value={userFormRole === 'SUPER_ADMIN' ? '' : userFormBranchId}
+                  onChange={(e) => setUserFormBranchId(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border rounded-xl font-bold text-slate-900 dark:text-white disabled:opacity-50 cursor-pointer"
+                >
+                  {userFormRole === 'SUPER_ADMIN' ? (
+                    <option value="">All Branches</option>
+                  ) : (
+                    branches.map(b => (
+                      <option key={b.id} value={b.id}>
+                        {b.name} ({b.code})
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 pt-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={userFormActive}
+                  onChange={(e) => setUserFormActive(e.target.checked)}
+                  className="w-4 h-4 rounded text-indigo-600"
+                />
+                <span className="font-bold text-slate-700 dark:text-slate-300">
+                  Account is Active & Permitted to Login
+                </span>
+              </label>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t">
+              <button
+                type="button"
+                onClick={() => setUserModalOpen(false)}
+                className="px-4 py-2 font-bold text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2 font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-xs cursor-pointer"
+              >
+                Save Staff Account
               </button>
             </div>
           </form>

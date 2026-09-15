@@ -16,6 +16,7 @@ db.version(1).stores({
 
 db.version(2).stores({
   branches: 'id, code, name, prefix, is_active',
+  users: 'id, username, full_name, role, branch_id, is_active',
   patients: 'id, file_number, cpr_number, phone, full_name_en, full_name_ar, home_branch_id, created_at, updated_at',
   vitals: 'id, patient_id, recorded_at, created_at',
   attachments: 'id, patient_id, appointment_id, category, created_at',
@@ -75,9 +76,146 @@ export async function initializeDatabase() {
     ]);
   }
 
+  // 2. Seed Users & Staff Roles
+  const userCount = await db.users.count();
+  if (userCount === 0) {
+    await db.users.bulkPut([
+      {
+        id: 'user-superadmin',
+        username: 'superadmin',
+        full_name: 'Dr. Tariq Al Rabeesh (HQ Owner)',
+        role: 'SUPER_ADMIN',
+        branch_id: null,
+        email: 'superadmin@alrabeeshdental.com',
+        phone: '+973 3900 0000',
+        is_active: true
+      },
+      {
+        id: 'user-admin-mnm',
+        username: 'admin_manama',
+        full_name: 'Hassan Al-Mahmood (Manama Admin)',
+        role: 'BRANCH_ADMIN',
+        branch_id: 'branch-mnm',
+        email: 'manama.admin@alrabeeshdental.com',
+        phone: '+973 3911 1111',
+        is_active: true
+      },
+      {
+        id: 'user-admin-rfa',
+        username: 'admin_riffa',
+        full_name: 'Maryam Al-Doseri (Riffa Admin)',
+        role: 'BRANCH_ADMIN',
+        branch_id: 'branch-rfa',
+        email: 'riffa.admin@alrabeeshdental.com',
+        phone: '+973 3922 2222',
+        is_active: true
+      },
+      {
+        id: 'user-admin-sef',
+        username: 'admin_seef',
+        full_name: 'Zainab Bucheeri (Seef Admin)',
+        role: 'BRANCH_ADMIN',
+        branch_id: 'branch-sef',
+        email: 'seef.admin@alrabeeshdental.com',
+        phone: '+973 3933 3333',
+        is_active: true
+      },
+      {
+        id: 'user-admin-muh',
+        username: 'admin_muharraq',
+        full_name: 'Jasim Al-Jowder (Muharraq Admin)',
+        role: 'BRANCH_ADMIN',
+        branch_id: 'branch-muh',
+        email: 'muharraq.admin@alrabeeshdental.com',
+        phone: '+973 3944 4444',
+        is_active: true
+      },
+      {
+        id: 'user-rec-mnm',
+        username: 'reception_manama',
+        full_name: 'Fatima Reception (Manama)',
+        role: 'RECEPTIONIST',
+        branch_id: 'branch-mnm',
+        email: 'reception.mnm@alrabeeshdental.com',
+        phone: '+973 1722 3344',
+        is_active: true
+      },
+      {
+        id: 'user-rec-rfa',
+        username: 'reception_riffa',
+        full_name: 'Layla Reception (Riffa)',
+        role: 'RECEPTIONIST',
+        branch_id: 'branch-rfa',
+        email: 'reception.rfa@alrabeeshdental.com',
+        phone: '+973 1777 8899',
+        is_active: true
+      },
+      {
+        id: 'user-rec-sef',
+        username: 'reception_seef',
+        full_name: 'Sarah Reception (Seef)',
+        role: 'RECEPTIONIST',
+        branch_id: 'branch-sef',
+        email: 'reception.sef@alrabeeshdental.com',
+        phone: '+973 1758 1122',
+        is_active: true
+      },
+      {
+        id: 'user-rec-muh',
+        username: 'reception_muharraq',
+        full_name: 'Noor Reception (Muharraq)',
+        role: 'RECEPTIONIST',
+        branch_id: 'branch-muh',
+        email: 'reception.muh@alrabeeshdental.com',
+        phone: '+973 1733 4455',
+        is_active: true
+      },
+      {
+        id: 'user-doc-tariq',
+        username: 'dr_tariq',
+        full_name: 'Dr. Tariq Al-Mansoor',
+        role: 'DOCTOR',
+        branch_id: 'branch-mnm',
+        email: 'dr.tariq@alrabeeshdental.com',
+        phone: '+973 3912 3456',
+        is_active: true
+      },
+      {
+        id: 'user-doc-faisal',
+        username: 'dr_faisal',
+        full_name: 'Dr. Faisal Al-Hassan',
+        role: 'DOCTOR',
+        branch_id: 'branch-rfa',
+        email: 'dr.faisal@alrabeeshdental.com',
+        phone: '+973 3934 5678',
+        is_active: true
+      },
+      {
+        id: 'user-doc-ahmed',
+        username: 'dr_ahmed',
+        full_name: 'Dr. Ahmed Bucheeri',
+        role: 'DOCTOR',
+        branch_id: 'branch-sef',
+        email: 'dr.ahmed@alrabeeshdental.com',
+        phone: '+973 3956 7890',
+        is_active: true
+      },
+      {
+        id: 'user-doc-priya',
+        username: 'dr_priya',
+        full_name: 'Dr. Priya Sharma',
+        role: 'DOCTOR',
+        branch_id: 'branch-muh',
+        email: 'dr.priya@alrabeeshdental.com',
+        phone: '+973 3945 6789',
+        is_active: true
+      }
+    ]);
+  }
+
   const settingsCount = await db.settings.count();
   if (settingsCount === 0) {
-    // 2. Seed Settings with Active Branch
+    // 3. Seed Settings with Active Branch
     await db.settings.put({
       id: 'clinic_settings',
       clinic_name: 'Al Rabeesh Dental Specialty Center',
@@ -103,17 +241,18 @@ export async function initializeDatabase() {
       updated_at: new Date().toISOString()
     });
 
-    // 3. Seed 5 Clinic Doctors with Branch Assignments
+    // 4. Seed 8 Clinic Doctors (2 per branch across Manama, Riffa, Seef, Muharraq)
     await db.doctors.bulkPut([
+      // Manama Branch Doctors
       {
-        id: 'doc-1',
+        id: 'doc-mnm-1',
         name: 'Dr. Tariq Al-Mansoor',
         specialty: 'Senior Consultant Orthodontist',
         qualification: 'BDS, MSc Orthodontics (UK)',
         room_number: 'Room 101',
-        chair_number: 'Dental Chair 1',
+        chair_number: 'Manama Chair 1',
         primary_branch_id: 'branch-mnm',
-        branch_ids: ['branch-mnm', 'branch-sef'],
+        branches_assigned: ['branch-mnm'],
         phone: '+973 3912 3456',
         email: 'dr.tariq@alrabeeshdental.com',
         photo_url: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=200&auto=format&fit=crop&q=80',
@@ -124,14 +263,14 @@ export async function initializeDatabase() {
         is_active: true
       },
       {
-        id: 'doc-2',
+        id: 'doc-mnm-2',
         name: 'Dr. Sarah Jenkins',
         specialty: 'Endodontist & Root Canal Specialist',
         qualification: 'DDS, Endodontics Board Certified',
         room_number: 'Room 102',
-        chair_number: 'Dental Chair 2',
+        chair_number: 'Manama Chair 2',
         primary_branch_id: 'branch-mnm',
-        branch_ids: ['branch-mnm', 'branch-rfa'],
+        branches_assigned: ['branch-mnm'],
         phone: '+973 3923 4567',
         email: 'dr.sarah@alrabeeshdental.com',
         photo_url: 'https://images.unsplash.com/photo-1594824813598-a1c6a6f65152?w=200&auto=format&fit=crop&q=80',
@@ -141,18 +280,58 @@ export async function initializeDatabase() {
         slot_duration_mins: 30,
         is_active: true
       },
+
+      // Riffa Branch Doctors
       {
-        id: 'doc-3',
+        id: 'doc-rfa-1',
         name: 'Dr. Faisal Al-Hassan',
         specialty: 'Oral & Maxillofacial Surgeon',
         qualification: 'BDS, FRCS (Ireland), Implantology',
-        room_number: 'Room 103',
-        chair_number: 'Dental Chair 3 (Surgical)',
+        room_number: 'Room 201',
+        chair_number: 'Riffa Chair 1 (Surgical)',
         primary_branch_id: 'branch-rfa',
-        branch_ids: ['branch-rfa', 'branch-sef'],
+        branches_assigned: ['branch-rfa'],
         phone: '+973 3934 5678',
         email: 'dr.faisal@alrabeeshdental.com',
         photo_url: 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?w=200&auto=format&fit=crop&q=80',
+        color_tag: '#059669', // Emerald
+        start_time: '09:00',
+        end_time: '17:00',
+        slot_duration_mins: 30,
+        is_active: true
+      },
+      {
+        id: 'doc-rfa-2',
+        name: 'Dr. Reem Al-Doseri',
+        specialty: 'Restorative & Aesthetic Dentist',
+        qualification: 'BDS, Restorative Master (Cairo)',
+        room_number: 'Room 202',
+        chair_number: 'Riffa Chair 2',
+        primary_branch_id: 'branch-rfa',
+        branches_assigned: ['branch-rfa'],
+        phone: '+973 3967 8901',
+        email: 'dr.reem@alrabeeshdental.com',
+        photo_url: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=200&auto=format&fit=crop&q=80',
+        color_tag: '#10B981', // Teal
+        start_time: '09:00',
+        end_time: '17:00',
+        slot_duration_mins: 30,
+        is_active: true
+      },
+
+      // Seef Branch Doctors
+      {
+        id: 'doc-sef-1',
+        name: 'Dr. Ahmed Bucheeri',
+        specialty: 'Cosmetic Dentist & Smile Designer',
+        qualification: 'BDS, Cosmetic Fellow (USA)',
+        room_number: 'Room 301',
+        chair_number: 'Seef Chair 1 (VIP)',
+        primary_branch_id: 'branch-sef',
+        branches_assigned: ['branch-sef'],
+        phone: '+973 3956 7890',
+        email: 'dr.ahmed@alrabeeshdental.com',
+        photo_url: 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=200&auto=format&fit=crop&q=80',
         color_tag: '#7C3AED', // Purple
         start_time: '09:00',
         end_time: '17:00',
@@ -160,14 +339,34 @@ export async function initializeDatabase() {
         is_active: true
       },
       {
-        id: 'doc-4',
+        id: 'doc-sef-2',
+        name: 'Dr. Layla Al-Mahroos',
+        specialty: 'Prosthodontist & Crown Specialist',
+        qualification: 'MDS Prosthodontics (UK)',
+        room_number: 'Room 302',
+        chair_number: 'Seef Chair 2',
+        primary_branch_id: 'branch-sef',
+        branches_assigned: ['branch-sef'],
+        phone: '+973 3978 9012',
+        email: 'dr.layla@alrabeeshdental.com',
+        photo_url: 'https://images.unsplash.com/photo-1594824813585-802526e033d5?w=200&auto=format&fit=crop&q=80',
+        color_tag: '#DB2777', // Pink
+        start_time: '09:00',
+        end_time: '17:00',
+        slot_duration_mins: 30,
+        is_active: true
+      },
+
+      // Muharraq Branch Doctors
+      {
+        id: 'doc-muh-1',
         name: 'Dr. Priya Sharma',
         specialty: 'Pediatric & Preventive Dentist',
         qualification: 'MDS Pediatric Dentistry',
-        room_number: 'Room 104',
-        chair_number: 'Dental Chair 4 (Pediatric)',
+        room_number: 'Room 401',
+        chair_number: 'Muharraq Chair 1 (Kids)',
         primary_branch_id: 'branch-muh',
-        branch_ids: ['branch-muh', 'branch-mnm'],
+        branches_assigned: ['branch-muh'],
         phone: '+973 3945 6789',
         email: 'dr.priya@alrabeeshdental.com',
         photo_url: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=200&auto=format&fit=crop&q=80',
@@ -178,18 +377,18 @@ export async function initializeDatabase() {
         is_active: true
       },
       {
-        id: 'doc-5',
-        name: 'Dr. Ahmed Bucheeri',
-        specialty: 'Cosmetic Dentist & Prosthodontist',
-        qualification: 'BDS, Cosmetic Dentistry Fellow (USA)',
-        room_number: 'Room 105',
-        chair_number: 'Dental Chair 5',
-        primary_branch_id: 'branch-sef',
-        branch_ids: ['branch-sef', 'branch-mnm'],
-        phone: '+973 3956 7890',
-        email: 'dr.ahmed@alrabeeshdental.com',
-        photo_url: 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=200&auto=format&fit=crop&q=80',
-        color_tag: '#DB2777', // Pink
+        id: 'doc-muh-2',
+        name: 'Dr. Khalid Al-Jowder',
+        specialty: 'General Dental Surgeon & Laser Specialist',
+        qualification: 'BDS, Laser Dentistry Fellow',
+        room_number: 'Room 402',
+        chair_number: 'Muharraq Chair 2',
+        primary_branch_id: 'branch-muh',
+        branches_assigned: ['branch-muh'],
+        phone: '+973 3989 0123',
+        email: 'dr.khalid@alrabeeshdental.com',
+        photo_url: 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?w=200&auto=format&fit=crop&q=80',
+        color_tag: '#EA580C', // Orange
         start_time: '09:00',
         end_time: '17:00',
         slot_duration_mins: 30,
@@ -197,7 +396,7 @@ export async function initializeDatabase() {
       }
     ]);
 
-    // 4. Seed Dental Services
+    // 5. Seed Dental Services
     await db.services.bulkPut([
       {
         id: 'srv-1',
@@ -291,7 +490,7 @@ export async function initializeDatabase() {
       }
     ]);
 
-    // 5. Seed Initial Sample Patients with Smart Branch-Prefixed File Numbers
+    // 6. Seed Initial Sample Patients with Smart Branch-Prefixed File Numbers
     await db.patients.bulkPut([
       {
         id: 'pat-1',
@@ -343,7 +542,7 @@ export async function initializeDatabase() {
       },
       {
         id: 'pat-3',
-        file_number: 'ARB-MNM-26-0003',
+        file_number: 'ARB-SEF-26-0003',
         cpr_number: '951104889',
         full_name_en: 'Rahul Rajesh Menon',
         full_name_ar: 'راهول راجيش مينون',
@@ -359,22 +558,47 @@ export async function initializeDatabase() {
         photo_base64: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
         allergies: 'Sulfa Drugs',
         medical_alerts: 'Mild Asthma',
-        home_branch_id: 'branch-mnm',
-        created_at_branch_id: 'branch-mnm',
+        home_branch_id: 'branch-sef',
+        created_at_branch_id: 'branch-sef',
         source: 'CARD_READER',
         created_at: new Date(Date.now() - 86400000).toISOString(),
+        updated_at: new Date().toISOString()
+      },
+      {
+        id: 'pat-4',
+        file_number: 'ARB-MUH-26-0004',
+        cpr_number: '990214811',
+        full_name_en: 'Yousif Ebrahim Al-Buflasa',
+        full_name_ar: 'يوسف إبراهيم البوفلاسة',
+        phone: '+973 3918 2736',
+        email: 'yousif.b@example.com',
+        dob: '1999-02-14',
+        gender: 'MALE',
+        nationality: 'Bahraini',
+        blood_group: 'AB+',
+        address: 'House 88, Road 2101, Busaiteen, Muharraq',
+        emergency_contact_name: 'Ebrahim Al-Buflasa (Father)',
+        emergency_contact_phone: '+973 3922 8844',
+        photo_base64: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+        allergies: 'None',
+        medical_alerts: 'None',
+        home_branch_id: 'branch-muh',
+        created_at_branch_id: 'branch-muh',
+        source: 'CARD_READER',
+        created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }
     ]);
 
-    // 6. Seed Sample Appointments with Branch IDs
+    // 7. Seed Sample Appointments across All 4 Branches for Today
     const today = new Date().toISOString().split('T')[0];
     await db.appointments.bulkPut([
+      // Manama Appointments
       {
-        id: 'app-1',
+        id: 'app-mnm-1',
         patient_id: 'pat-1',
-        doctor_id: 'doc-2', // Dr. Sarah (Root Canal)
-        service_id: 'srv-3', // RCT (2 slots = 60 mins)
+        doctor_id: 'doc-mnm-2', // Dr. Sarah (Root Canal)
+        service_id: 'srv-3',
         branch_id: 'branch-mnm',
         appointment_date: today,
         start_time: '09:30',
@@ -389,10 +613,10 @@ export async function initializeDatabase() {
         updated_at: new Date().toISOString()
       },
       {
-        id: 'app-2',
+        id: 'app-mnm-2',
         patient_id: 'pat-2',
-        doctor_id: 'doc-1', // Dr. Tariq (Orthodontist)
-        service_id: 'srv-9', // Wire adjustment (1 slot = 30 mins)
+        doctor_id: 'doc-mnm-1', // Dr. Tariq (Orthodontist)
+        service_id: 'srv-9',
         branch_id: 'branch-mnm',
         appointment_date: today,
         start_time: '10:00',
@@ -406,21 +630,81 @@ export async function initializeDatabase() {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       },
+
+      // Riffa Appointments
       {
-        id: 'app-3',
+        id: 'app-rfa-1',
+        patient_id: 'pat-2',
+        doctor_id: 'doc-rfa-1', // Dr. Faisal (Oral Surgeon)
+        service_id: 'srv-5', // Extraction
+        branch_id: 'branch-rfa',
+        appointment_date: today,
+        start_time: '11:00',
+        end_time: '12:00',
+        slot_count: 2,
+        duration_mins: 60,
+        status: 'CONFIRMED',
+        chief_complaint: 'Wisdom tooth extraction lower left jaw.',
+        notes: 'Impacted wisdom tooth #38.',
+        estimated_fee: 45.000,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      },
+      {
+        id: 'app-rfa-2',
+        patient_id: 'pat-1',
+        doctor_id: 'doc-rfa-2', // Dr. Reem (Restorative)
+        service_id: 'srv-2', // Scaling
+        branch_id: 'branch-rfa',
+        appointment_date: today,
+        start_time: '14:30',
+        end_time: '15:00',
+        slot_count: 1,
+        duration_mins: 30,
+        status: 'SCHEDULED',
+        chief_complaint: 'Routine dental scaling and cleaning.',
+        notes: 'Annual hygiene recall.',
+        estimated_fee: 25.000,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      },
+
+      // Seef Appointments
+      {
+        id: 'app-sef-1',
         patient_id: 'pat-3',
-        doctor_id: 'doc-5', // Dr. Ahmed (Cosmetic)
-        service_id: 'srv-7', // Whitening (2 slots = 60 mins)
+        doctor_id: 'doc-sef-1', // Dr. Ahmed (Cosmetic)
+        service_id: 'srv-7', // Whitening
         branch_id: 'branch-sef',
         appointment_date: today,
         start_time: '11:00',
         end_time: '12:00',
         slot_count: 2,
         duration_mins: 60,
-        status: 'SCHEDULED',
-        chief_complaint: 'Pre-wedding teeth whitening package.',
+        status: 'IN_CHAIR',
+        chief_complaint: 'In-office Zoom laser teeth whitening.',
         notes: 'Shade guide A3 target A1.',
         estimated_fee: 85.000,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      },
+
+      // Muharraq Appointments
+      {
+        id: 'app-muh-1',
+        patient_id: 'pat-4',
+        doctor_id: 'doc-muh-1', // Dr. Priya (Pediatric)
+        service_id: 'srv-1', // Exam
+        branch_id: 'branch-muh',
+        appointment_date: today,
+        start_time: '09:00',
+        end_time: '09:30',
+        slot_count: 1,
+        duration_mins: 30,
+        status: 'CONFIRMED',
+        chief_complaint: 'Pediatric dental checkup and fluoride varnish.',
+        notes: 'First visit child dental screening.',
+        estimated_fee: 15.000,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }

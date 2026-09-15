@@ -45,14 +45,32 @@ const AppContext = createContext(null);
 export function AppProvider({ children }) {
   const [activeTab, setActiveTab] = useState('appointments'); // 'appointments' | 'patients' | 'vitals' | 'doctors' | 'services' | 'settings'
   const [selectedPatientId, setSelectedPatientId] = useState(null);
-  const [activeUserRole, setActiveUserRole] = useState('ADMIN'); // 'ADMIN' | 'DOCTOR' | 'RECEPTIONIST'
   const [theme, setTheme] = useState('light');
   
+  // Users & Role State
+  const [users, setUsers] = useState([]);
+  const [currentUser, setCurrentUser] = useState({
+    id: 'user-superadmin',
+    username: 'superadmin',
+    full_name: 'Dr. Tariq Al Rabeesh (HQ Owner)',
+    role: 'SUPER_ADMIN',
+    branch_id: null
+  });
+
   // Multi-Branch State
   const [branches, setBranches] = useState([]);
   const [activeBranchId, setActiveBranchIdState] = useState(
     localStorage.getItem('clinic_active_branch') || 'branch-mnm'
   );
+
+  // Computed helper: Is current user Super Admin
+  const isSuperAdmin = currentUser?.role === 'SUPER_ADMIN';
+
+  // Active User Role for backwards compatibility
+  const activeUserRole = currentUser?.role || 'SUPER_ADMIN';
+  const setActiveUserRole = (role) => {
+    setCurrentUser(prev => ({ ...prev, role }));
+  };
 
   // Settings state with Operating Hours and Break Time
   const [settings, setSettings] = useState({
@@ -107,14 +125,77 @@ export function AppProvider({ children }) {
     color: '#2563EB'
   };
 
-  // Change Active Branch
-  const changeActiveBranch = (branchId) => {
+  // Change Active Branch (Available for Super Admin or when logging in)
+  const changeActiveBranch = (branchId, force = false) => {
+    if (!force && !isSuperAdmin && currentUser?.branch_id && currentUser.branch_id !== branchId) {
+      showToast(`Access restricted: Your account is assigned to ${branches.find(b => b.id === currentUser.branch_id)?.name || 'your home branch'}`, 'warning');
+      return;
+    }
     setActiveBranchIdState(branchId);
     localStorage.setItem('clinic_active_branch', branchId);
     const branch = branches.find(b => b.id === branchId);
     if (branch) {
-      showToast(`Switched active location to: ${branch.name} (${branch.code})`, 'info');
+      showToast(`Active Branch: ${branch.name} (${branch.code})`, 'info');
     }
+  };
+
+  // Load Users from Database
+  const refreshUsers = async () => {
+    try {
+      const allUsers = await db.users.toArray();
+      setUsers(allUsers);
+      const savedUserId = localStorage.getItem('clinic_current_user_id');
+      if (savedUserId) {
+        const found = allUsers.find(u => u.id === savedUserId);
+        if (found) {
+          setCurrentUser(found);
+          if (found.branch_id) {
+            setActiveBranchIdState(found.branch_id);
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load users:', e);
+    }
+  };
+
+  // Switch / Login as User
+  const loginAsUser = (userId) => {
+    const targetUser = users.find(u => u.id === userId);
+    if (!targetUser) return;
+    
+    setCurrentUser(targetUser);
+    localStorage.setItem('clinic_current_user_id', targetUser.id);
+    
+    if (targetUser.branch_id) {
+      changeActiveBranch(targetUser.branch_id, true);
+    }
+    
+    const roleLabels = {
+      SUPER_ADMIN: '👑 Super Admin (HQ)',
+      BRANCH_ADMIN: '🏢 Branch Admin',
+      DOCTOR: '🩺 Doctor',
+      RECEPTIONIST: '📋 Receptionist'
+    };
+    
+    showToast(`Logged in as ${targetUser.full_name} (${roleLabels[targetUser.role] || targetUser.role})`, 'success');
+  };
+
+  // Create or Update User
+  const saveUser = async (userData) => {
+    const isNew = !userData.id;
+    const userId = userData.id || `user-${Date.now()}`;
+    const cleanUser = {
+      ...userData,
+      id: userId,
+      is_active: userData.is_active !== undefined ? userData.is_active : true,
+      updated_at: new Date().toISOString()
+    };
+
+    await db.users.put(cleanUser);
+    await syncEngine.queueChange('users', userId, isNew ? 'INSERT' : 'UPDATE', cleanUser);
+    await refreshUsers();
+    showToast(`User account ${cleanUser.full_name} saved successfully`, 'success');
   };
 
   // Load and refresh branches from IndexedDB
@@ -161,15 +242,16 @@ export function AppProvider({ children }) {
       return `${prefix}-${yearShort}-${nextSeq}`;
     } catch (e) {
       const yearShort = new Date().getFullYear().toString().slice(-2);
-      return `ARB-MNM-${yearShort}-${String(Date.now()).slice(-4)}`;
+      return `ARB-GEN-${yearShort}-${Date.now().toString().slice(-4)}`;
     }
   };
 
-  // Initialize DB, Load Settings and Branches
+  // Initialize DB, Load Settings, Users and Branches
   useEffect(() => {
     async function setup() {
       await initializeDatabase();
       await refreshBranches();
+      await refreshUsers();
 
       const savedSettings = await db.settings.get('clinic_settings');
       if (savedSettings) {
@@ -337,6 +419,12 @@ export function AppProvider({ children }) {
         setActiveTab,
         selectedPatientId,
         setSelectedPatientId,
+        currentUser,
+        users,
+        loginAsUser,
+        saveUser,
+        refreshUsers,
+        isSuperAdmin,
         activeUserRole,
         setActiveUserRole,
         branches,

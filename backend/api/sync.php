@@ -258,6 +258,29 @@ if ($method === 'POST' && $action === 'push') {
                         ':is_active' => isset($payload['is_active']) ? ($payload['is_active'] ? 1 : 0) : 1
                     ]);
                 }
+            } elseif ($entityType === 'users') {
+                if ($operation === 'INSERT' || $operation === 'UPDATE') {
+                    $stmt = $db->prepare("
+                        INSERT INTO users (id, username, password_hash, full_name, branch_id, role, is_active, updated_at)
+                        VALUES (:id, :username, :password_hash, :full_name, :branch_id, :role, :is_active, NOW())
+                        ON DUPLICATE KEY UPDATE
+                            username = VALUES(username),
+                            full_name = VALUES(full_name),
+                            branch_id = VALUES(branch_id),
+                            role = VALUES(role),
+                            is_active = VALUES(is_active),
+                            updated_at = NOW()
+                    ");
+                    $stmt->execute([
+                        ':id' => $payload['id'],
+                        ':username' => $payload['username'],
+                        ':password_hash' => $payload['password_hash'] ?? 'demo123',
+                        ':full_name' => $payload['full_name'],
+                        ':branch_id' => $payload['branch_id'] ?? null,
+                        ':role' => $payload['role'] ?? 'BRANCH_ADMIN',
+                        ':is_active' => isset($payload['is_active']) ? ($payload['is_active'] ? 1 : 0) : 1
+                    ]);
+                }
             } elseif ($entityType === 'settings') {
                 if ($operation === 'INSERT' || $operation === 'UPDATE') {
                     $stmt = $db->prepare("
@@ -327,6 +350,7 @@ if ($method === 'GET' && $action === 'pull') {
     $since = isset($_GET['since']) ? $_GET['since'] : '1970-01-01 00:00:00';
 
     $branches = $db->query("SELECT * FROM branches WHERE updated_at >= '$since'")->fetchAll();
+    $users = $db->query("SELECT id, username, full_name, branch_id, role, is_active, updated_at FROM users WHERE updated_at >= '$since'")->fetchAll();
     $patients = $db->query("SELECT * FROM patients WHERE updated_at >= '$since'")->fetchAll();
     $appointments = $db->query("SELECT * FROM appointments WHERE updated_at >= '$since'")->fetchAll();
     $doctors = $db->query("SELECT * FROM doctors WHERE updated_at >= '$since'")->fetchAll();
@@ -337,6 +361,7 @@ if ($method === 'GET' && $action === 'pull') {
         'serverTime' => date('Y-m-d H:i:s'),
         'data' => [
             'branches' => $branches,
+            'users' => $users,
             'patients' => $patients,
             'appointments' => $appointments,
             'doctors' => $doctors,
