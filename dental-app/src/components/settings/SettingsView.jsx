@@ -248,7 +248,7 @@ export default function SettingsView() {
 
   return (
     <div className="w-full flex justify-center">
-      <div className="space-y-4 w-full max-w-7xl px-3 sm:px-5 lg:px-6 py-2">
+      <div className="space-y-4 w-full max-w-[1720px] px-2 sm:px-4 lg:px-6 py-2">
         
         {/* Settings Master Navigation Bar / Sub-Menu */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl p-3 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">

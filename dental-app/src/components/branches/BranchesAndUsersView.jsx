@@ -158,7 +158,7 @@ export default function BranchesAndUsersView() {
 
   return (
     <div className="w-full flex justify-center">
-      <div className="space-y-5 w-full max-w-7xl px-3 sm:px-5 lg:px-6 py-2">
+      <div className="space-y-5 w-full max-w-[1720px] px-2 sm:px-4 lg:px-6 py-2">
         
         {/* Header Bar with Sub-View Switcher & Quick Action Buttons */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -416,7 +416,7 @@ export default function BranchesAndUsersView() {
             </div>
 
             {/* Staff Accounts Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
               {filteredUsers.map(u => {
                 const isMe = currentUser?.id === u.id;
                 const branchObj = branches.find(b => b.id === u.branch_id);
