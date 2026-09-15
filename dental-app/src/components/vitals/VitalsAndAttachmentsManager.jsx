@@ -4,6 +4,8 @@ import { useApp } from '../../context/AppContext';
 import { syncEngine } from '../../services/syncEngine';
 import confetti from 'canvas-confetti';
 import SearchablePatientSelect from '../common/SearchablePatientSelect';
+import { renderAsync as renderDocx } from 'docx-preview';
+import * as XLSX from 'xlsx';
 import { 
   Activity, 
   FileText, 
@@ -199,6 +201,15 @@ export default function VitalsAndAttachmentsManager({ activePatientId, onBackToL
   const [csvRows, setCsvRows] = useState([]);
   const [copiedText, setCopiedText] = useState(false);
 
+  // Word (.docx) & Excel (.xlsx/.xls) in-window preview state
+  const [excelSheets, setExcelSheets] = useState([]); // [{ name, data: [][] }]
+  const [activeExcelSheet, setActiveExcelSheet] = useState(0);
+  const [docxError, setDocxError] = useState(null);
+  const [excelError, setExcelError] = useState(null);
+  const [isDocxLoading, setIsDocxLoading] = useState(false);
+  const [isExcelLoading, setIsExcelLoading] = useState(false);
+  const docxContainerRef = useRef(null);
+
   // Helper to categorize attachment file formats
   const getAttachmentType = (att) => {
     if (!att) return 'unknown';
@@ -235,12 +246,18 @@ export default function VitalsAndAttachmentsManager({ activePatientId, onBackToL
     return 'other';
   };
 
-  // Convert Base64 to Blob URL and extract text/CSV content
+  // Convert Base64 to Blob URL, render DOCX, and parse Excel / Text content
   useEffect(() => {
     if (!previewAttachment || !previewAttachment.file_data_base64) {
       setBlobUrl(null);
       setTextContent('');
       setCsvRows([]);
+      setExcelSheets([]);
+      setActiveExcelSheet(0);
+      setDocxError(null);
+      setExcelError(null);
+      setIsDocxLoading(false);
+      setIsExcelLoading(false);
       setCopiedText(false);
       return;
     }
@@ -251,6 +268,10 @@ export default function VitalsAndAttachmentsManager({ activePatientId, onBackToL
     setIsInverted(false);
     setIsFullscreen(false);
     setCopiedText(false);
+    setDocxError(null);
+    setExcelError(null);
+    setExcelSheets([]);
+    setActiveExcelSheet(0);
 
     const type = getAttachmentType(previewAttachment);
 
@@ -271,19 +292,65 @@ export default function VitalsAndAttachmentsManager({ activePatientId, onBackToL
       const createdUrl = URL.createObjectURL(blob);
       setBlobUrl(createdUrl);
 
-      // Parse text or CSV content for in-app viewing
-      if (type === 'text' || type === 'excel' && (previewAttachment.original_name || '').endsWith('.csv')) {
+      // 1. Text or simple CSV inspection
+      if (type === 'text') {
         const textDecoder = new TextDecoder('utf-8');
         const decodedText = textDecoder.decode(byteArray);
         setTextContent(decodedText);
+      }
 
-        if ((previewAttachment.original_name || '').toLowerCase().endsWith('.csv') || computedMime.includes('csv')) {
-          const lines = decodedText.split(/\r?\n/).filter(line => line.trim().length > 0);
-          const parsedGrid = lines.map(line => {
-            const cells = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
-            return cells.map(c => c.replace(/^"|"$/g, '').trim());
+      // 2. Excel & CSV Multi-sheet workbook parser
+      if (type === 'excel') {
+        setIsExcelLoading(true);
+        try {
+          const workbook = XLSX.read(byteArray, { type: 'array' });
+          const sheets = workbook.SheetNames.map((sheetName) => {
+            const sheet = workbook.Sheets[sheetName];
+            const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+            return {
+              name: sheetName,
+              data: rows
+            };
           });
-          setCsvRows(parsedGrid);
+          setExcelSheets(sheets);
+          setActiveExcelSheet(0);
+          setIsExcelLoading(false);
+        } catch (err) {
+          console.warn('Excel parse error:', err);
+          setExcelError('Could not parse workbook table. Please click Open or Download.');
+          setIsExcelLoading(false);
+        }
+      }
+
+      // 3. Word (.docx) client-side in-window rendering
+      if (type === 'word') {
+        const fileName = (previewAttachment.original_name || previewAttachment.file_name || '').toLowerCase();
+        const isDocx = fileName.endsWith('.docx') || computedMime.includes('wordprocessingml');
+        if (isDocx) {
+          setIsDocxLoading(true);
+          setTimeout(async () => {
+            if (docxContainerRef.current) {
+              try {
+                docxContainerRef.current.innerHTML = '';
+                await renderDocx(byteArray.buffer, docxContainerRef.current, undefined, {
+                  className: 'docx',
+                  inWrapper: true,
+                  ignoreWidth: false,
+                  ignoreHeight: false,
+                  breakPages: true
+                });
+                setIsDocxLoading(false);
+              } catch (err) {
+                console.warn('DOCX Render Error:', err);
+                setDocxError('Could not render DOCX layout directly. Please click Open or Download.');
+                setIsDocxLoading(false);
+              }
+            } else {
+              setIsDocxLoading(false);
+            }
+          }, 120);
+        } else {
+          setDocxError('Legacy .doc binary format cannot be rendered directly in browser. Please click Open or Download.');
         }
       }
 
@@ -291,7 +358,7 @@ export default function VitalsAndAttachmentsManager({ activePatientId, onBackToL
         URL.revokeObjectURL(createdUrl);
       };
     } catch (err) {
-      console.warn('Could not generate blob URL for preview:', err);
+      console.warn('Could not generate preview:', err);
     }
   }, [previewAttachment]);
 
@@ -1139,7 +1206,7 @@ export default function VitalsAndAttachmentsManager({ activePatientId, onBackToL
                   id="attachFile"
                   onChange={handleFileChange}
                   className="hidden"
-                  accept="image/*,application/pdf,.dcm"
+                  accept="image/*,application/pdf,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.dcm,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain,text/csv"
                 />
                 <label htmlFor="attachFile" className="cursor-pointer flex flex-col items-center gap-2">
                   <Upload className="w-8 h-8 text-indigo-500" />
@@ -1147,7 +1214,7 @@ export default function VitalsAndAttachmentsManager({ activePatientId, onBackToL
                     {selectedFile ? selectedFile.name : 'Click to Browse File'}
                   </span>
                   <span className="text-[11px] text-slate-400">
-                    Supports Dental X-Rays, OPG, JPG, PNG, PDF, DICOM (Max: 100MB)
+                    Supports Dental X-Rays, OPG, JPG, PNG, PDF, Word (.docx), Excel (.xlsx/.csv), DICOM & Text (Max: 100MB)
                   </span>
                   {selectedFile && (
                     <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px]">
@@ -1453,46 +1520,83 @@ export default function VitalsAndAttachmentsManager({ activePatientId, onBackToL
                   </div>
                 )}
 
-                {/* 3. EXCEL & SPREADSHEET VIEWER (CSV Table or Excel Doc Preview) */}
+                {/* 3. EXCEL & SPREADSHEET VIEWER (Interactive Multi-Sheet Table) */}
                 {fileType === 'excel' && (
-                  <div className="w-full h-full p-2 sm:p-4 flex flex-col flex-1 overflow-auto bg-slate-900 rounded-2xl">
-                    {csvRows.length > 0 ? (
-                      <div className="w-full h-full overflow-auto rounded-xl border border-slate-700 bg-slate-950 text-slate-200">
-                        <table className="w-full text-left text-xs border-collapse">
-                          <thead className="sticky top-0 bg-slate-800 text-emerald-400 font-bold uppercase border-b border-slate-700 shadow-xs">
-                            <tr>
-                              <th className="p-2.5 border-r border-slate-700 w-12 text-center text-slate-500">#</th>
-                              {csvRows[0].map((header, idx) => (
-                                <th key={idx} className="p-2.5 border-r border-slate-700 whitespace-nowrap">
-                                  {header || `Column ${idx + 1}`}
-                                </th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-800 text-slate-300">
-                            {csvRows.slice(1).map((row, rIdx) => (
-                              <tr key={rIdx} className="hover:bg-slate-800/60 transition-colors">
-                                <td className="p-2 border-r border-slate-800 text-center font-mono text-[11px] text-slate-500 bg-slate-900/60">
-                                  {rIdx + 1}
-                                </td>
-                                {row.map((cell, cIdx) => (
-                                  <td key={cIdx} className="p-2 border-r border-slate-800 whitespace-nowrap font-mono text-[11px]">
-                                    {cell}
-                                  </td>
+                  <div className="w-full h-full flex flex-col flex-1 overflow-hidden bg-slate-900 rounded-2xl">
+                    {/* Sheet Tabs */}
+                    {excelSheets.length > 1 && (
+                      <div className="flex items-center gap-1.5 px-3 py-2 bg-slate-950 border-b border-slate-800 overflow-x-auto shrink-0">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 mr-2 flex items-center gap-1">
+                          <Table className="w-3.5 h-3.5 text-emerald-400" />
+                          Sheets:
+                        </span>
+                        {excelSheets.map((sh, sIdx) => (
+                          <button
+                            key={sIdx}
+                            type="button"
+                            onClick={() => setActiveExcelSheet(sIdx)}
+                            className={`px-3 py-1 text-xs font-bold rounded-lg transition whitespace-nowrap ${
+                              activeExcelSheet === sIdx
+                                ? 'bg-emerald-600 text-white shadow-xs'
+                                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                            }`}
+                          >
+                            {sh.name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {isExcelLoading && (
+                      <div className="flex flex-col items-center justify-center h-full min-h-[350px] text-slate-400">
+                        <FileSpreadsheet className="w-16 h-16 text-emerald-500 mb-2 animate-bounce" />
+                        <p className="font-bold text-sm text-slate-200">Parsing Spreadsheet Table...</p>
+                      </div>
+                    )}
+
+                    {!isExcelLoading && excelSheets.length > 0 && excelSheets[activeExcelSheet] && (
+                      <div className="w-full h-full flex-1 overflow-auto rounded-xl border border-slate-800 bg-slate-950 text-slate-200">
+                        <table className="w-full text-left text-xs border-collapse font-sans">
+                          {excelSheets[activeExcelSheet].data.length > 0 && (
+                            <>
+                              <thead className="sticky top-0 bg-slate-800 text-emerald-400 font-bold uppercase border-b border-slate-700 shadow-xs z-10">
+                                <tr>
+                                  <th className="p-2.5 border-r border-slate-700 w-12 text-center text-slate-400 font-mono">#</th>
+                                  {excelSheets[activeExcelSheet].data[0].map((header, idx) => (
+                                    <th key={idx} className="p-2.5 border-r border-slate-700 whitespace-nowrap">
+                                      {header !== undefined && header !== '' ? String(header) : `Col ${idx + 1}`}
+                                    </th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-800 text-slate-200">
+                                {excelSheets[activeExcelSheet].data.slice(1).map((row, rIdx) => (
+                                  <tr key={rIdx} className="hover:bg-slate-800/60 transition-colors">
+                                    <td className="p-2 border-r border-slate-800 text-center font-mono text-[11px] text-slate-500 bg-slate-900/60 sticky left-0">
+                                      {rIdx + 1}
+                                    </td>
+                                    {row.map((cell, cIdx) => (
+                                      <td key={cIdx} className="p-2 border-r border-slate-800 whitespace-nowrap font-mono text-[11px]">
+                                        {cell !== undefined ? String(cell) : ''}
+                                      </td>
+                                    ))}
+                                  </tr>
                                 ))}
-                              </tr>
-                            ))}
-                          </tbody>
+                              </tbody>
+                            </>
+                          )}
                         </table>
                       </div>
-                    ) : (
+                    )}
+
+                    {!isExcelLoading && excelSheets.length === 0 && (
                       <div className="flex flex-col items-center justify-center h-full text-center text-slate-300 py-12">
                         <div className="p-4 bg-emerald-950/60 rounded-3xl border border-emerald-800 mb-4 text-emerald-400">
                           <FileSpreadsheet className="w-16 h-16" />
                         </div>
                         <h4 className="font-bold text-lg text-white mb-1">{previewAttachment.original_name}</h4>
                         <p className="text-xs text-slate-400 max-w-md mb-6">
-                          Microsoft Excel clinical spreadsheet ready for examination. View in Fullscreen or open directly in your preferred office application.
+                          {excelError || 'Spreadsheet ready. Click below to open or download.'}
                         </p>
                         <div className="flex flex-wrap items-center gap-3">
                           {blobUrl && (
@@ -1520,37 +1624,51 @@ export default function VitalsAndAttachmentsManager({ activePatientId, onBackToL
                   </div>
                 )}
 
-                {/* 4. WORD DOCUMENT VIEWER (DOCX, DOC, RTF) */}
+                {/* 4. WORD DOCUMENT VIEWER (DOCX in-window rendered) */}
                 {fileType === 'word' && (
-                  <div className="w-full h-full p-4 flex flex-col flex-1 items-center justify-center text-center bg-slate-900 rounded-2xl text-slate-300">
-                    <div className="p-4 bg-blue-950/60 rounded-3xl border border-blue-800 mb-4 text-blue-400">
-                      <FileText className="w-16 h-16" />
-                    </div>
-                    <h4 className="font-bold text-lg text-white mb-1">{previewAttachment.original_name}</h4>
-                    <p className="text-xs text-slate-400 max-w-md mb-6">
-                      Microsoft Word clinical report document ready for examination. View in Fullscreen or open in Word/Docs.
-                    </p>
-                    <div className="flex flex-wrap items-center gap-3">
-                      {blobUrl && (
-                        <a
-                          href={blobUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg transition flex items-center gap-2 text-xs"
-                        >
-                          <ExternalLink className="w-4 h-4" />
-                          <span>Open in Word / Browser Tab</span>
-                        </a>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => setIsFullscreen((prev) => !prev)}
-                        className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl border border-slate-700 transition flex items-center gap-2 text-xs"
-                      >
-                        <Maximize2 className="w-4 h-4" />
-                        <span>{isFullscreen ? 'Exit Fullscreen' : 'Fullscreen View'}</span>
-                      </button>
-                    </div>
+                  <div className="w-full h-full flex-1 flex flex-col bg-slate-100 dark:bg-slate-900 rounded-2xl overflow-hidden">
+                    {isDocxLoading && (
+                      <div className="flex flex-col items-center justify-center h-full min-h-[350px] text-slate-400">
+                        <FileText className="w-16 h-16 text-blue-500 mb-2 animate-bounce" />
+                        <p className="font-bold text-sm text-slate-700 dark:text-slate-300">Rendering Word Document (.docx)...</p>
+                      </div>
+                    )}
+                    {docxError && (
+                      <div className="w-full h-full p-4 flex flex-col flex-1 items-center justify-center text-center bg-slate-900 rounded-2xl text-slate-300">
+                        <div className="p-4 bg-blue-950/60 rounded-3xl border border-blue-800 mb-4 text-blue-400">
+                          <FileText className="w-16 h-16" />
+                        </div>
+                        <h4 className="font-bold text-lg text-white mb-1">{previewAttachment.original_name}</h4>
+                        <p className="text-xs text-slate-400 max-w-md mb-6">
+                          {docxError}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-3">
+                          {blobUrl && (
+                            <a
+                              href={blobUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg transition flex items-center gap-2 text-xs"
+                            >
+                              <ExternalLink className="w-4 h-4" />
+                              <span>Open in Word / Browser Tab</span>
+                            </a>
+                          )}
+                          <a
+                            href={previewAttachment.file_data_base64}
+                            download={previewAttachment.original_name}
+                            className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl border border-slate-700 transition flex items-center gap-2 text-xs"
+                          >
+                            <Download className="w-4 h-4" />
+                            <span>Download Original</span>
+                          </a>
+                        </div>
+                      </div>
+                    )}
+                    <div 
+                      ref={docxContainerRef} 
+                      className={`w-full h-full flex-1 overflow-auto p-2 sm:p-4 ${isDocxLoading || docxError ? 'hidden' : 'block'}`}
+                    />
                   </div>
                 )}
 

@@ -61,6 +61,42 @@
   transition-duration: 150ms;
 }
 
+/* DOCX In-Window Document Viewer Styles */
+.docx-wrapper {
+  background: transparent !important;
+  padding: 1.5rem !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 1.5rem !important;
+}
+
+.docx-wrapper > section.docx {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.25), 0 4px 6px -2px rgba(0, 0, 0, 0.1) !important;
+  border-radius: 12px !important;
+  margin-bottom: 2rem !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  padding: 2.5rem 3rem !important;
+}
+
+.docx-wrapper > section.docx * {
+  color: inherit !important;
+}
+
+.docx-wrapper table {
+  border-collapse: collapse !important;
+  width: 100% !important;
+  margin: 1rem 0 !important;
+}
+
+.docx-wrapper td, .docx-wrapper th {
+  border: 1px solid #cbd5e1 !important;
+  padding: 0.5rem 0.75rem !important;
+}
+
 /* Animation keyframes */
 @keyframes pulseSlow {
   0%, 100% { opacity: 1; transform: scale(1); }
