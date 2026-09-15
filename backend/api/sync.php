@@ -171,6 +171,19 @@ if ($method === 'POST' && $action === 'push') {
                 }
             } elseif ($entityType === 'patients') {
                 if ($operation === 'INSERT' || $operation === 'UPDATE') {
+                    // Check duplicate CPR on server
+                    if (!empty($payload['cpr_number'])) {
+                        $cprCheck = $db->prepare("SELECT id FROM patients WHERE cpr_number = :cpr AND id != :id LIMIT 1");
+                        $cprCheck->execute([':cpr' => trim($payload['cpr_number']), ':id' => $payload['id']]);
+                        $existingCpr = $cprCheck->fetch();
+                        if ($existingCpr && $operation === 'INSERT') {
+                            // Existing patient has this CPR; mark processed and skip duplicate insert
+                            $results['processed']++;
+                            $results['syncedIds'][] = $entityId;
+                            continue;
+                        }
+                    }
+
                     $stmt = $db->prepare("
                         INSERT INTO patients (id, file_number, cpr_number, home_branch_id, created_at_branch_id, full_name_en, full_name_ar, phone, email, dob, gender, nationality, blood_group, address, photo_base64, allergies, medical_alerts, source, updated_at)
                         VALUES (:id, :file_number, :cpr_number, :home_branch_id, :created_at_branch_id, :full_name_en, :full_name_ar, :phone, :email, :dob, :gender, :nationality, :blood_group, :address, :photo_base64, :allergies, :medical_alerts, :source, NOW())

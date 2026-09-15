@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../../db/indexedDB';
 import { useApp } from '../../context/AppContext';
 import { syncEngine } from '../../services/syncEngine';
@@ -19,7 +19,8 @@ import {
   User, 
   Sparkles,
   ChevronRight,
-  ShieldAlert
+  ShieldAlert,
+  ExternalLink
 } from 'lucide-react';
 
 export default function PatientListAndRegistration({ isRegisterModalOpen, setIsRegisterModalOpen, onSelectPatient }) {
@@ -71,6 +72,14 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
     loadPatients();
   }, []);
 
+  // Real-time CPR duplicate detector
+  const duplicateCprPatient = useMemo(() => {
+    if (!formCpr || !formCpr.trim()) return null;
+    const clean = formCpr.trim().replace(/[\s-]+/g, '');
+    if (clean.length < 3) return null;
+    return patients.find(p => p.cpr_number && p.cpr_number.toString().trim().replace(/[\s-]+/g, '') === clean) || null;
+  }, [formCpr, patients]);
+
   // Update target branch when branch dropdown changes in form
   const handleBranchChangeInForm = (targetBranchId) => {
     setFormHomeBranchId(targetBranchId);
@@ -111,7 +120,8 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
 
   const populateFormWithCardData = (card) => {
     if (!card) return;
-    setFormCpr(card.cpr_number || '');
+    const cleanCpr = card.cpr_number ? card.cpr_number.toString().trim().replace(/[\s-]+/g, '') : '';
+    setFormCpr(cleanCpr);
     setFormNameEn(card.full_name_en || '');
     setFormNameAr(card.full_name_ar || '');
     setFormDob(card.dob || '');
@@ -123,6 +133,13 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
     setFormSource(card.source || 'CARD_READER');
     if (card.phone) setFormPhone(card.phone);
     if (card.email) setFormEmail(card.email);
+
+    if (cleanCpr) {
+      const existing = patients.find(p => p.cpr_number && p.cpr_number.toString().trim().replace(/[\s-]+/g, '') === cleanCpr);
+      if (existing) {
+        showToast(`⚠️ CPR ${cleanCpr} is already registered to "${existing.full_name_en}" (File: ${existing.file_number})! Duplicate registration is blocked.`, 'error', 7000);
+      }
+    }
   };
 
   // When a card was scanned globally, open the form with it
@@ -152,7 +169,7 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
     }
   };
 
-  // Save Patient
+  // Save Patient with Strict CPR Uniqueness & Concurrency Safety
   const handleSavePatient = async (e) => {
     e.preventDefault();
     if (!formNameEn || !formPhone) {
@@ -160,11 +177,20 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
       return;
     }
 
-    // Check duplicate CPR if CPR provided
-    if (formCpr) {
-      const existing = patients.find(p => p.cpr_number === formCpr);
-      if (existing) {
-        showToast(`Patient with CPR ${formCpr} already exists (${existing.file_number})!`, 'error');
+    // Strict Unique CPR / National ID Validation
+    if (formCpr && formCpr.trim()) {
+      const cleanCpr = formCpr.trim().replace(/[\s-]+/g, '');
+      const allCurrentPatients = await db.patients.toArray();
+      const existingPatient = allCurrentPatients.find(p => 
+        p.cpr_number && p.cpr_number.toString().trim().replace(/[\s-]+/g, '') === cleanCpr
+      );
+
+      if (existingPatient) {
+        showToast(
+          `🚫 Registration Blocked: CPR / National ID "${cleanCpr}" is already registered to "${existingPatient.full_name_en || existingPatient.full_name_ar || 'Existing Patient'}" (File: ${existingPatient.file_number}). Duplicate CPRs are not permitted.`,
+          'error',
+          7000
+        );
         return;
       }
     }
@@ -180,14 +206,16 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
       finalFileNumber = await generateBranchFileNumber(targetBranch);
     }
 
+    const cleanCpr = formCpr && formCpr.trim() ? formCpr.trim().replace(/[\s-]+/g, '') : null;
+
     const newPatient = {
       id: `pat-${Date.now()}`,
       file_number: finalFileNumber,
-      cpr_number: formCpr || null,
-      full_name_en: formNameEn,
-      full_name_ar: formNameAr || null,
-      phone: formPhone,
-      email: formEmail || null,
+      cpr_number: cleanCpr,
+      full_name_en: formNameEn.trim(),
+      full_name_ar: formNameAr ? formNameAr.trim() : null,
+      phone: formPhone.trim(),
+      email: formEmail ? formEmail.trim() : null,
       dob: formDob || null,
       gender: formGender,
       nationality: formNationality,
@@ -588,17 +616,39 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
 
               {/* CPR & Contact */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1">
-                    CPR / National ID
-                  </label>
+                <div className="relative">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
+                      CPR / National ID
+                    </label>
+                    {duplicateCprPatient && (
+                      <span className="text-[10px] font-extrabold text-red-600 dark:text-red-400 uppercase tracking-wider flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" /> Duplicate CPR
+                      </span>
+                    )}
+                  </div>
                   <input
                     type="text"
                     value={formCpr}
                     onChange={(e) => setFormCpr(e.target.value)}
                     placeholder="e.g. 920512348"
-                    className="w-full px-3.5 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-bold"
+                    className={`w-full px-3.5 py-2 rounded-xl text-xs font-bold transition ${
+                      duplicateCprPatient
+                        ? 'bg-red-50 dark:bg-red-950/40 border-2 border-red-500 text-red-900 dark:text-red-200 ring-2 ring-red-500/20'
+                        : 'bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white'
+                    }`}
                   />
+                  {duplicateCprPatient && (
+                    <div className="mt-1.5 p-2 rounded-xl bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-[11px] leading-tight flex items-start gap-2 shadow-xs">
+                      <ShieldAlert className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-black text-red-800 dark:text-red-200">Already Registered!</span>
+                        <p className="mt-0.5 text-slate-700 dark:text-slate-300">
+                          CPR {formCpr} is assigned to <strong className="text-slate-900 dark:text-white">{duplicateCprPatient.full_name_en}</strong> (File: <strong className="text-blue-600 dark:text-blue-400">{duplicateCprPatient.file_number}</strong>).
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -767,15 +817,22 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
                 <button
                   type="button"
                   onClick={() => setIsRegisterModalOpen(false)}
-                  className="px-4 py-2.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl"
+                  className="px-4 py-2.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md shadow-blue-500/25 transition-all"
+                  disabled={!!duplicateCprPatient}
+                  className={`px-6 py-2.5 text-xs font-bold rounded-xl transition-all flex items-center gap-2 ${
+                    duplicateCprPatient
+                      ? 'bg-slate-300 dark:bg-slate-700 text-slate-500 cursor-not-allowed opacity-75'
+                      : 'text-white bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-500/25 cursor-pointer active:scale-98'
+                  }`}
+                  title={duplicateCprPatient ? 'Cannot register: CPR is already assigned to another patient file' : 'Create patient record'}
                 >
-                  Register & Create Patient File
+                  {duplicateCprPatient && <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />}
+                  <span>{duplicateCprPatient ? 'Duplicate CPR Detected - Cannot Register' : 'Register & Create Patient File'}</span>
                 </button>
               </div>
 
