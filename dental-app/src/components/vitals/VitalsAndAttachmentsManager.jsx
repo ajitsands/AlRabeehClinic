@@ -30,7 +30,15 @@ import {
   Mic,
   MicOff,
   Sparkles,
-  RotateCcw
+  RotateCcw,
+  ZoomIn,
+  ZoomOut,
+  RotateCw,
+  Maximize2,
+  Minimize2,
+  Contrast,
+  RefreshCw,
+  Move
 } from 'lucide-react';
 
 export default function VitalsAndAttachmentsManager({ activePatientId, onBackToList }) {
@@ -171,6 +179,83 @@ export default function VitalsAndAttachmentsManager({ activePatientId, onBackToL
   const [selectedFile, setSelectedFile] = useState(null);
   const [fileBase64, setFileBase64] = useState('');
   const [previewAttachment, setPreviewAttachment] = useState(null);
+
+  // Diagnostic Image Viewer & Zoom Controls State
+  const [zoomScale, setZoomScale] = useState(1);
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [rotationAngle, setRotationAngle] = useState(0);
+  const [isInverted, setIsInverted] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Reset viewer parameters on opening a new attachment or closing preview
+  useEffect(() => {
+    if (previewAttachment) {
+      setZoomScale(1);
+      setPanOffset({ x: 0, y: 0 });
+      setRotationAngle(0);
+      setIsInverted(false);
+      setIsFullscreen(false);
+    }
+  }, [previewAttachment]);
+
+  const handleZoomIn = () => {
+    setZoomScale((prev) => Math.min(Number((prev + 0.25).toFixed(2)), 5));
+  };
+
+  const handleZoomOut = () => {
+    setZoomScale((prev) => Math.max(Number((prev - 0.25).toFixed(2)), 0.5));
+  };
+
+  const handleResetZoom = () => {
+    setZoomScale(1);
+    setPanOffset({ x: 0, y: 0 });
+    setRotationAngle(0);
+    setIsInverted(false);
+  };
+
+  const handleRotate = () => {
+    setRotationAngle((prev) => (prev + 90) % 360);
+  };
+
+  const handleWheelZoom = (e) => {
+    if (!previewAttachment || !previewAttachment.mime_type?.startsWith('image/')) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const delta = e.deltaY < 0 ? 0.2 : -0.2;
+    setZoomScale((prev) => {
+      const next = Math.min(Math.max(prev + delta, 0.5), 5);
+      return Number(next.toFixed(2));
+    });
+  };
+
+  const handleMouseDown = (e) => {
+    if (e.button !== 0) return;
+    setIsDragging(true);
+    setDragStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isDragging) return;
+    setPanOffset({
+      x: e.clientX - dragStart.x,
+      y: e.clientY - dragStart.y
+    });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleDoubleClick = () => {
+    if (zoomScale > 1) {
+      setZoomScale(1);
+      setPanOffset({ x: 0, y: 0 });
+    } else {
+      setZoomScale(2.5);
+    }
+  };
 
   // Load initial patients & data
   const loadData = async () => {
@@ -1039,57 +1124,265 @@ export default function VitalsAndAttachmentsManager({ activePatientId, onBackToL
         </div>
       )}
 
-      {/* FULL PREVIEW MODAL */}
+      {/* FULL PREVIEW MODAL WITH INTERACTIVE X-RAY & IMAGE ZOOMING SUITE */}
       {previewAttachment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-4xl w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[92vh]">
+        <div className={`fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-2 sm:p-4 overflow-hidden ${isFullscreen ? 'p-0' : ''}`}>
+          <div className={`bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col transition-all duration-200 ${
+            isFullscreen 
+              ? 'w-screen h-screen rounded-none p-3 sm:p-4' 
+              : 'rounded-3xl max-w-6xl w-full p-4 sm:p-6 max-h-[96vh]'
+          }`}>
             
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <div>
-                <span className="px-2 py-0.5 text-[10px] font-extrabold uppercase bg-blue-100 text-blue-800 rounded-md">
+            {/* Header & Diagnostic Toolbar */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="min-w-0 flex items-center gap-2.5">
+                <span className={`px-2.5 py-1 text-[10px] font-black uppercase rounded-lg shrink-0 ${
+                  previewAttachment.category.includes('XRAY')
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300'
+                }`}>
                   {previewAttachment.category}
                 </span>
-                <h3 className="font-bold text-base text-slate-900 dark:text-white mt-1">
-                  {previewAttachment.file_name}
-                </h3>
+                <div className="min-w-0">
+                  <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-white truncate">
+                    {previewAttachment.file_name}
+                  </h3>
+                  {previewAttachment.notes && (
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-md">
+                      {previewAttachment.notes}
+                    </p>
+                  )}
+                </div>
               </div>
-              <button
-                onClick={() => setPreviewAttachment(null)}
-                className="p-1.5 text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-6 h-6" />
-              </button>
+
+              {/* Action & Zoom Controls */}
+              <div className="flex items-center flex-wrap gap-1.5 sm:gap-2">
+                {previewAttachment.mime_type?.startsWith('image/') && (
+                  <>
+                    {/* Zoom In & Out Controls */}
+                    <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-0.5 border border-slate-200 dark:border-slate-700">
+                      <button
+                        type="button"
+                        onClick={handleZoomOut}
+                        className="p-1.5 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg transition disabled:opacity-40"
+                        disabled={zoomScale <= 0.5}
+                        title="Zoom Out (-25%)"
+                      >
+                        <ZoomOut className="w-4 h-4" />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleResetZoom}
+                        className="px-2 py-1 text-xs font-black text-slate-800 dark:text-white hover:text-blue-600 min-w-[50px] text-center"
+                        title="Click to reset zoom to 100%"
+                      >
+                        {Math.round(zoomScale * 100)}%
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleZoomIn}
+                        className="p-1.5 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg transition disabled:opacity-40"
+                        disabled={zoomScale >= 5}
+                        title="Zoom In (+25%)"
+                      >
+                        <ZoomIn className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* Rotate */}
+                    <button
+                      type="button"
+                      onClick={handleRotate}
+                      className="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl border border-slate-200 dark:border-slate-700 transition"
+                      title="Rotate 90° Clockwise"
+                    >
+                      <RotateCw className="w-4 h-4" />
+                    </button>
+
+                    {/* X-Ray Negative / Contrast Inversion */}
+                    <button
+                      type="button"
+                      onClick={() => setIsInverted((prev) => !prev)}
+                      className={`p-2 rounded-xl border transition flex items-center gap-1 text-xs font-semibold ${
+                        isInverted
+                          ? 'bg-amber-500 text-white border-amber-600 shadow-xs'
+                          : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700'
+                      }`}
+                      title="Toggle X-Ray Invert / High-Contrast Mode"
+                    >
+                      <Contrast className="w-4 h-4" />
+                      <span className="hidden sm:inline text-[11px]">X-Ray Invert</span>
+                    </button>
+
+                    {/* Reset All Adjustments */}
+                    {(zoomScale !== 1 || panOffset.x !== 0 || panOffset.y !== 0 || rotationAngle !== 0 || isInverted) && (
+                      <button
+                        type="button"
+                        onClick={handleResetZoom}
+                        className="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl border border-slate-200 dark:border-slate-700 transition"
+                        title="Reset Zoom, Position, and Rotation"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                      </button>
+                    )}
+
+                    {/* Fullscreen Toggle */}
+                    <button
+                      type="button"
+                      onClick={() => setIsFullscreen((prev) => !prev)}
+                      className="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl border border-slate-200 dark:border-slate-700 transition"
+                      title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen Examination'}
+                    >
+                      {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                    </button>
+                  </>
+                )}
+
+                {/* Close Button */}
+                <button
+                  type="button"
+                  onClick={() => setPreviewAttachment(null)}
+                  className="p-2 text-slate-400 hover:text-rose-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition"
+                  title="Close Viewer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
-            <div className="my-4 flex-1 overflow-auto flex items-center justify-center bg-slate-950 rounded-2xl p-2 min-h-[300px]">
-              {previewAttachment.file_data_base64 && previewAttachment.mime_type.startsWith('image/') ? (
-                <img
-                  src={previewAttachment.file_data_base64}
-                  alt={previewAttachment.file_name}
-                  className="max-h-[65vh] object-contain rounded-xl"
-                />
+            {/* Interactive Image / X-Ray Canvas Area */}
+            <div 
+              className={`relative my-3 flex-1 overflow-hidden flex items-center justify-center bg-slate-950 rounded-2xl select-none transition-all ${
+                isFullscreen ? 'h-[calc(100vh-140px)]' : 'h-[60vh] min-h-[350px]'
+              } ${
+                zoomScale > 1 
+                  ? isDragging 
+                    ? 'cursor-grabbing' 
+                    : 'cursor-grab' 
+                  : 'cursor-zoom-in'
+              }`}
+              onWheel={handleWheelZoom}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
+              onDoubleClick={handleDoubleClick}
+            >
+              {previewAttachment.file_data_base64 && previewAttachment.mime_type?.startsWith('image/') ? (
+                <div className="w-full h-full flex items-center justify-center overflow-hidden">
+                  <img
+                    src={previewAttachment.file_data_base64}
+                    alt={previewAttachment.file_name}
+                    draggable={false}
+                    style={{
+                      transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomScale}) rotate(${rotationAngle}deg)`,
+                      filter: isInverted ? 'invert(1) hue-rotate(180deg) contrast(130%)' : 'none',
+                      transition: isDragging ? 'none' : 'transform 0.12s ease-out',
+                      maxHeight: '100%',
+                      maxWidth: '100%',
+                      objectFit: 'contain',
+                      userSelect: 'none'
+                    }}
+                    className="pointer-events-none drop-shadow-2xl"
+                  />
+                </div>
               ) : (
-                <div className="text-center text-slate-400 py-12">
-                  <FileText className="w-16 h-16 mx-auto mb-2 text-indigo-400" />
-                  <p className="font-bold">{previewAttachment.original_name}</p>
-                  <p className="text-xs">Preview available upon download</p>
+                <div className="text-center text-slate-400 py-16">
+                  <FileText className="w-16 h-16 mx-auto mb-3 text-indigo-400" />
+                  <p className="font-bold text-slate-200">{previewAttachment.original_name}</p>
+                  <p className="text-xs text-slate-500 mt-1">Non-image attachment. Download below to view in standard viewer.</p>
+                </div>
+              )}
+
+              {/* Overlay Quick Zoom Presets Bar */}
+              {previewAttachment.mime_type?.startsWith('image/') && (
+                <div className="absolute bottom-3 inset-x-0 flex justify-center items-center pointer-events-none px-4">
+                  <div className="flex items-center gap-1.5 bg-slate-900/85 backdrop-blur-md border border-slate-700/80 px-3 py-1.5 rounded-full shadow-xl pointer-events-auto text-xs">
+                    <span className="text-[11px] font-semibold text-slate-400 hidden md:inline mr-1">
+                      Quick Zoom:
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setZoomScale(1);
+                        setPanOffset({ x: 0, y: 0 });
+                      }}
+                      className={`px-2 py-0.5 rounded-md font-bold text-[11px] transition ${
+                        zoomScale === 1
+                          ? 'bg-blue-600 text-white'
+                          : 'text-slate-300 hover:bg-slate-800'
+                      }`}
+                    >
+                      Fit (100%)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setZoomScale(1.5)}
+                      className={`px-2 py-0.5 rounded-md font-bold text-[11px] transition ${
+                        zoomScale === 1.5
+                          ? 'bg-blue-600 text-white'
+                          : 'text-slate-300 hover:bg-slate-800'
+                      }`}
+                    >
+                      150%
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setZoomScale(2)}
+                      className={`px-2 py-0.5 rounded-md font-bold text-[11px] transition ${
+                        zoomScale === 2
+                          ? 'bg-blue-600 text-white'
+                          : 'text-slate-300 hover:bg-slate-800'
+                      }`}
+                    >
+                      200%
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setZoomScale(3)}
+                      className={`px-2 py-0.5 rounded-md font-bold text-[11px] transition ${
+                        zoomScale === 3
+                          ? 'bg-blue-600 text-white'
+                          : 'text-slate-300 hover:bg-slate-800'
+                      }`}
+                    >
+                      300%
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
 
-            <div className="flex items-center justify-between pt-3 border-t text-xs">
-              <span className="text-slate-500">
-                Size: {(previewAttachment.file_size_bytes / (1024 * 1024)).toFixed(2)} MB • Uploaded: {formatDate(previewAttachment.created_at)}
-              </span>
+            {/* Footer with metadata & download */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs">
+              <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400 text-[11px]">
+                <span>
+                  Size: <strong className="text-slate-700 dark:text-slate-300">{(previewAttachment.file_size_bytes / (1024 * 1024)).toFixed(2)} MB</strong>
+                </span>
+                <span>•</span>
+                <span>
+                  Uploaded: <strong className="text-slate-700 dark:text-slate-300">{formatDate(previewAttachment.created_at)}</strong>
+                </span>
+                {previewAttachment.mime_type?.startsWith('image/') && (
+                  <>
+                    <span className="hidden sm:inline">•</span>
+                    <span className="hidden sm:inline text-blue-600 dark:text-blue-400 font-medium">
+                      💡 Scroll wheel to zoom • Drag to pan • Double click to zoom in
+                    </span>
+                  </>
+                )}
+              </div>
               
               {previewAttachment.file_data_base64 && (
                 <a
                   href={previewAttachment.file_data_base64}
                   download={previewAttachment.original_name}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-xs"
+                  className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-xs transition"
                 >
                   <Download className="w-4 h-4" />
-                  <span>Download File</span>
+                  <span>Download High-Res Original</span>
                 </a>
               )}
             </div>
