@@ -28,18 +28,24 @@ CREATE TABLE IF NOT EXISTS `branches` (
     `address` TEXT NULL,
     `phone` VARCHAR(30) NULL,
     `color` VARCHAR(20) NOT NULL DEFAULT '#2563EB',
+    `country` VARCHAR(50) NULL DEFAULT 'Bahrain',
+    `currency_code` VARCHAR(10) NULL,
+    `currency_symbol` VARCHAR(10) NULL,
+    `currency_decimals` INT NULL,
+    `timezone` VARCHAR(50) NULL,
+    `date_format` VARCHAR(20) NULL,
     `is_active` TINYINT(1) NOT NULL DEFAULT 1,
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
 -- Seed Default Branches
-INSERT INTO `branches` (`id`, `name`, `code`, `prefix`, `address`, `phone`, `color`, `is_active`)
+INSERT INTO `branches` (`id`, `name`, `code`, `prefix`, `address`, `phone`, `color`, `country`, `currency_code`, `currency_symbol`, `currency_decimals`, `timezone`, `date_format`, `is_active`)
 VALUES
-    ('branch-mnm', 'Al Rabeesh Manama Branch', 'MNM', 'ARB-MNM', 'Building 124, Road 3801, Manama Center', '+973 1722 3344', '#2563EB', 1),
-    ('branch-rfa', 'Al Rabeesh Riffa Branch', 'RFA', 'ARB-RFA', 'Villa 45, Avenue 12, East Riffa', '+973 1777 5566', '#10B981', 1),
-    ('branch-sef', 'Al Rabeesh Seef Branch', 'SEF', 'ARB-SEF', 'Seef Mall Medical Tower, 4th Floor', '+973 1758 9900', '#8B5CF6', 1),
-    ('branch-muh', 'Al Rabeesh Muharraq Branch', 'MUH', 'ARB-MUH', 'Road 2104, Block 221, Muharraq', '+973 1734 1122', '#F59E0B', 1)
+    ('branch-mnm', 'Al Rabeesh Manama Branch', 'MNM', 'ARB-MNM', 'Building 124, Road 3801, Manama Center', '+973 1722 3344', '#2563EB', 'Bahrain', 'BHD', 'BD', 3, 'Asia/Bahrain', 'DD/MM/YYYY', 1),
+    ('branch-rfa', 'Al Rabeesh Riffa Branch', 'RFA', 'ARB-RFA', 'Villa 45, Avenue 12, East Riffa', '+973 1777 5566', '#10B981', 'Bahrain', 'BHD', 'BD', 3, 'Asia/Bahrain', 'DD/MM/YYYY', 1),
+    ('branch-sef', 'Al Rabeesh Seef Branch', 'SEF', 'ARB-SEF', 'Seef Mall Medical Tower, 4th Floor', '+973 1758 9900', '#8B5CF6', 'Bahrain', 'BHD', 'BD', 3, 'Asia/Bahrain', 'DD/MM/YYYY', 1),
+    ('branch-muh', 'Al Rabeesh Muharraq Branch', 'MUH', 'ARB-MUH', 'Road 2104, Block 221, Muharraq', '+973 1734 1122', '#F59E0B', 'Bahrain', 'BHD', 'BD', 3, 'Asia/Bahrain', 'DD/MM/YYYY', 1)
 ON DUPLICATE KEY UPDATE `name` = VALUES(`name`);
 
 -- 3. Users & Staff Roles Table (Multi-Branch Access Control)

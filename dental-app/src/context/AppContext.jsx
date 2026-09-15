@@ -3,6 +3,18 @@ import { db, initializeDatabase, seedFreshMultiBranchData } from '../db/indexedD
 import { smartCardService } from '../services/smartCardReader';
 import { syncEngine } from '../services/syncEngine';
 
+// Gulf & International Regional Presets for Branches
+export const BRANCH_REGIONAL_PRESETS = [
+  { country: 'Bahrain', flag: '🇧🇭', code: 'BHD', symbol: 'BD', decimals: 3, timezone: 'Asia/Bahrain', dateFormat: 'DD/MM/YYYY', phonePrefix: '+973' },
+  { country: 'Kuwait', flag: '🇰🇼', code: 'KWD', symbol: 'KD', decimals: 3, timezone: 'Asia/Kuwait', dateFormat: 'DD/MM/YYYY', phonePrefix: '+965' },
+  { country: 'Saudi Arabia', flag: '🇸🇦', code: 'SAR', symbol: 'SAR', decimals: 2, timezone: 'Asia/Riyadh', dateFormat: 'DD/MM/YYYY', phonePrefix: '+966' },
+  { country: 'UAE', flag: '🇦🇪', code: 'AED', symbol: 'AED', decimals: 2, timezone: 'Asia/Dubai', dateFormat: 'DD/MM/YYYY', phonePrefix: '+971' },
+  { country: 'Qatar', flag: '🇶🇦', code: 'QAR', symbol: 'QR', decimals: 2, timezone: 'Asia/Qatar', dateFormat: 'DD/MM/YYYY', phonePrefix: '+974' },
+  { country: 'Oman', flag: '🇴🇲', code: 'OMR', symbol: 'OMR', decimals: 3, timezone: 'Asia/Muscat', dateFormat: 'DD/MM/YYYY', phonePrefix: '+968' },
+  { country: 'India', flag: '🇮🇳', code: 'INR', symbol: '₹', decimals: 2, timezone: 'Asia/Kolkata', dateFormat: 'DD/MM/YYYY', phonePrefix: '+91' },
+  { country: 'International', flag: '🌐', code: 'USD', symbol: '$', decimals: 2, timezone: 'UTC', dateFormat: 'YYYY-MM-DD', phonePrefix: '+1' },
+];
+
 // Helper to generate dynamic clinic time slots
 export function generateClinicTimeSlots(openTime = '09:00', closeTime = '17:30', intervalMins = 30) {
   const slots = [];
@@ -354,16 +366,26 @@ export function AppProvider({ children }) {
     }
   };
 
-  // Add or update branch
+  // Add or update branch with localization support
   const saveBranch = async (branchData) => {
     const isNew = !branchData.id;
     const branchId = branchData.id || `branch-${Date.now()}`;
     const cleanBranch = {
       ...branchData,
       id: branchId,
+      name: branchData.name?.trim(),
       code: (branchData.code || 'BRN').toUpperCase().trim(),
       prefix: (branchData.prefix || `ARB-${branchData.code}`).toUpperCase().trim(),
-      is_active: branchData.is_active !== undefined ? branchData.is_active : true
+      country: branchData.country || 'Bahrain',
+      currency_code: branchData.currency_code ? branchData.currency_code.trim().toUpperCase() : null,
+      currency_symbol: branchData.currency_symbol ? branchData.currency_symbol.trim() : null,
+      currency_decimals: branchData.currency_decimals !== undefined && branchData.currency_decimals !== null && branchData.currency_decimals !== ''
+        ? Number(branchData.currency_decimals)
+        : null,
+      timezone: branchData.timezone ? branchData.timezone.trim() : null,
+      date_format: branchData.date_format ? branchData.date_format.trim() : null,
+      is_active: branchData.is_active !== undefined ? branchData.is_active : true,
+      updated_at: new Date().toISOString()
     };
 
     await db.branches.put(cleanBranch);
@@ -534,19 +556,28 @@ export function AppProvider({ children }) {
     showToast('System settings updated successfully', 'success');
   };
 
-  // Format Currency according to settings (e.g. BD 25.500 for Bahrain 3 decimals, or ₹ 500.00 for India)
-  const formatCurrency = (amount) => {
+  // Format Currency according to active branch localization, falling back to global clinic settings
+  const formatCurrency = (amount, branchOrId = null) => {
     const num = Number(amount) || 0;
-    const decimals = settings.currency_decimals !== undefined ? settings.currency_decimals : 3;
+    const targetBranch = typeof branchOrId === 'object' && branchOrId !== null
+      ? branchOrId
+      : (branches.find(b => b.id === (branchOrId || activeBranchId)) || activeBranch);
+
+    // If targetBranch has its own currency_symbol, use it; else fallback to settings
+    const symbol = targetBranch?.currency_symbol || settings.currency_symbol || 'BD';
+    const decimals = targetBranch?.currency_decimals !== undefined && targetBranch?.currency_decimals !== null && targetBranch?.currency_decimals !== ''
+      ? Number(targetBranch.currency_decimals)
+      : (settings.currency_decimals !== undefined ? Number(settings.currency_decimals) : 3);
+
     const formattedNum = num.toLocaleString(undefined, {
       minimumFractionDigits: decimals,
       maximumFractionDigits: decimals
     });
-    return `${settings.currency_symbol || 'BD'} ${formattedNum}`;
+    return `${symbol} ${formattedNum}`;
   };
 
-  // Format Date according to settings (DD/MM/YYYY, YYYY-MM-DD, MM/DD/YYYY)
-  const formatDate = (dateInput) => {
+  // Format Date according to active branch localization, falling back to global clinic settings
+  const formatDate = (dateInput, branchOrId = null) => {
     if (!dateInput) return '-';
     try {
       const d = new Date(dateInput);
@@ -555,7 +586,13 @@ export function AppProvider({ children }) {
       const month = String(d.getMonth() + 1).padStart(2, '0');
       const year = d.getFullYear();
 
-      switch (settings.date_format) {
+      const targetBranch = typeof branchOrId === 'object' && branchOrId !== null
+        ? branchOrId
+        : (branches.find(b => b.id === (branchOrId || activeBranchId)) || activeBranch);
+
+      const formatPattern = targetBranch?.date_format || settings.date_format || 'DD/MM/YYYY';
+
+      switch (formatPattern) {
         case 'YYYY-MM-DD':
           return `${year}-${month}-${day}`;
         case 'MM/DD/YYYY':

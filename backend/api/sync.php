@@ -27,7 +27,7 @@ if (!$db) {
 // Auto-migrate schema updates if missing in MySQL (Self-Healing Migration)
 function ensureSchemaUpToDate($db) {
     try {
-        // 1. Ensure `branches` table exists
+        // 1. Ensure `branches` table exists with localization columns
         $db->exec("CREATE TABLE IF NOT EXISTS `branches` (
             `id` VARCHAR(50) PRIMARY KEY,
             `name` VARCHAR(150) NOT NULL,
@@ -36,10 +36,32 @@ function ensureSchemaUpToDate($db) {
             `address` TEXT NULL,
             `phone` VARCHAR(30) NULL,
             `color` VARCHAR(20) NOT NULL DEFAULT '#2563EB',
+            `country` VARCHAR(50) NULL DEFAULT 'Bahrain',
+            `currency_code` VARCHAR(10) NULL,
+            `currency_symbol` VARCHAR(10) NULL,
+            `currency_decimals` INT NULL,
+            `timezone` VARCHAR(50) NULL,
+            `date_format` VARCHAR(20) NULL,
             `is_active` TINYINT(1) NOT NULL DEFAULT 1,
             `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
         ) ENGINE=InnoDB;");
+
+        // Ensure localization columns in branches
+        $brCols = [
+            'country' => "VARCHAR(50) NULL DEFAULT 'Bahrain'",
+            'currency_code' => "VARCHAR(10) NULL",
+            'currency_symbol' => "VARCHAR(10) NULL",
+            'currency_decimals' => "INT NULL",
+            'timezone' => "VARCHAR(50) NULL",
+            'date_format' => "VARCHAR(20) NULL"
+        ];
+        foreach ($brCols as $col => $type) {
+            $check = $db->query("SHOW COLUMNS FROM `branches` LIKE '$col'")->fetchAll();
+            if (empty($check)) {
+                $db->exec("ALTER TABLE `branches` ADD COLUMN `$col` $type;");
+            }
+        }
 
         // 2. Ensure `branch_id` exists in `users`
         $cols = $db->query("SHOW COLUMNS FROM `users` LIKE 'branch_id'")->fetchAll();
@@ -112,8 +134,8 @@ if ($method === 'POST' && $action === 'push') {
             if ($entityType === 'branches') {
                 if ($operation === 'INSERT' || $operation === 'UPDATE') {
                     $stmt = $db->prepare("
-                        INSERT INTO branches (id, name, code, prefix, address, phone, color, is_active, updated_at)
-                        VALUES (:id, :name, :code, :prefix, :address, :phone, :color, :is_active, NOW())
+                        INSERT INTO branches (id, name, code, prefix, address, phone, color, country, currency_code, currency_symbol, currency_decimals, timezone, date_format, is_active, updated_at)
+                        VALUES (:id, :name, :code, :prefix, :address, :phone, :color, :country, :currency_code, :currency_symbol, :currency_decimals, :timezone, :date_format, :is_active, NOW())
                         ON DUPLICATE KEY UPDATE
                             name = VALUES(name),
                             code = VALUES(code),
@@ -121,6 +143,12 @@ if ($method === 'POST' && $action === 'push') {
                             address = VALUES(address),
                             phone = VALUES(phone),
                             color = VALUES(color),
+                            country = VALUES(country),
+                            currency_code = VALUES(currency_code),
+                            currency_symbol = VALUES(currency_symbol),
+                            currency_decimals = VALUES(currency_decimals),
+                            timezone = VALUES(timezone),
+                            date_format = VALUES(date_format),
                             is_active = VALUES(is_active),
                             updated_at = NOW()
                     ");
@@ -132,6 +160,12 @@ if ($method === 'POST' && $action === 'push') {
                         ':address' => $payload['address'] ?? null,
                         ':phone' => $payload['phone'] ?? null,
                         ':color' => $payload['color'] ?? '#2563EB',
+                        ':country' => $payload['country'] ?? null,
+                        ':currency_code' => !empty($payload['currency_code']) ? $payload['currency_code'] : null,
+                        ':currency_symbol' => !empty($payload['currency_symbol']) ? $payload['currency_symbol'] : null,
+                        ':currency_decimals' => isset($payload['currency_decimals']) && $payload['currency_decimals'] !== '' ? intval($payload['currency_decimals']) : null,
+                        ':timezone' => !empty($payload['timezone']) ? $payload['timezone'] : null,
+                        ':date_format' => !empty($payload['date_format']) ? $payload['date_format'] : null,
                         ':is_active' => isset($payload['is_active']) ? ($payload['is_active'] ? 1 : 0) : 1
                     ]);
                 }
