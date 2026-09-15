@@ -233,7 +233,7 @@ class SmartCardReaderService {
         ReadAddressDetails: true,
         ReadBiometrics: true,
         ReadEmploymentInfo: true,
-        ReadImmigrationDetails: false,
+        ReadImmigrationDetails: true,
         ReadTrafficDetails: false,
         SilentReading: false,
         ReaderIndex: -1,
@@ -290,7 +290,7 @@ class SmartCardReaderService {
         ReadAddressDetails: true,
         ReadBiometrics: true,
         ReadEmploymentInfo: true,
-        ReadImmigrationDetails: false,
+        ReadImmigrationDetails: true,
         ReadTrafficDetails: false,
         SilentReading: false,
         ReaderIndex: -1,
@@ -322,6 +322,239 @@ class SmartCardReaderService {
     return this.parseCardPayload(json);
   }
 
+  // Helper to search fields case-insensitively across nested objects
+  findFieldValue(obj, ...possibleKeys) {
+    if (!obj || typeof obj !== 'object') return null;
+    const normalized = {};
+    for (const k of Object.keys(obj)) {
+      normalized[k.toLowerCase().replace(/[^a-z0-9]/g, '')] = obj[k];
+    }
+    for (const key of possibleKeys) {
+      const normKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const val = normalized[normKey];
+      if (val !== undefined && val !== null) {
+        const str = String(val).trim();
+        if (str !== '' && str.toLowerCase() !== 'null' && str.toLowerCase() !== 'undefined') {
+          return str;
+        }
+      }
+    }
+    return null;
+  }
+
+  // Resolve nationality from code/name/demonym
+  resolveNationality(raw, misc) {
+    const NATIONALITY_MAP = {
+      // ISO-3 Country & Nationality Codes
+      'IND': 'Indian',
+      '356': 'Indian',
+      'INDIA': 'Indian',
+      'INDIAN': 'Indian',
+      'BHR': 'Bahraini',
+      'BAH': 'Bahraini',
+      '048': 'Bahraini',
+      'BAHRAIN': 'Bahraini',
+      'BAHRAINI': 'Bahraini',
+      'SAU': 'Saudi',
+      '682': 'Saudi',
+      'SAUDI': 'Saudi',
+      'SAUDI ARABIA': 'Saudi',
+      'KWT': 'Kuwaiti',
+      '414': 'Kuwaiti',
+      'KUWAIT': 'Kuwaiti',
+      'KUWAITI': 'Kuwaiti',
+      'ARE': 'Emirati',
+      'UAE': 'Emirati',
+      '784': 'Emirati',
+      'EMIRATI': 'Emirati',
+      'UNITED ARAB EMIRATES': 'Emirati',
+      'OMN': 'Omani',
+      '512': 'Omani',
+      'OMAN': 'Omani',
+      'OMANI': 'Omani',
+      'QAT': 'Qatari',
+      '634': 'Qatari',
+      'QATAR': 'Qatari',
+      'QATARI': 'Qatari',
+      'PHL': 'Filipino',
+      '608': 'Filipino',
+      'PHILIPPINES': 'Filipino',
+      'FILIPINO': 'Filipino',
+      'PAK': 'Pakistani',
+      '586': 'Pakistani',
+      'PAKISTAN': 'Pakistani',
+      'PAKISTANI': 'Pakistani',
+      'BGD': 'Bangladeshi',
+      '050': 'Bangladeshi',
+      'BANGLADESH': 'Bangladeshi',
+      'BANGLADESHI': 'Bangladeshi',
+      'EGY': 'Egyptian',
+      '818': 'Egyptian',
+      'EGYPT': 'Egyptian',
+      'EGYPTIAN': 'Egyptian',
+      'JOR': 'Jordanian',
+      '400': 'Jordanian',
+      'JORDAN': 'Jordanian',
+      'JORDANIAN': 'Jordanian',
+      'SYR': 'Syrian',
+      '760': 'Syrian',
+      'SYRIA': 'Syrian',
+      'SYRIAN': 'Syrian',
+      'LBN': 'Lebanese',
+      '422': 'Lebanese',
+      'LEBANON': 'Lebanese',
+      'LEBANESE': 'Lebanese',
+      'YEM': 'Yemeni',
+      '887': 'Yemeni',
+      'YEMEN': 'Yemeni',
+      'YEMENI': 'Yemeni',
+      'SDN': 'Sudanese',
+      '729': 'Sudanese',
+      'SUDAN': 'Sudanese',
+      'SUDANESE': 'Sudanese',
+      'TUN': 'Tunisian',
+      '788': 'Tunisian',
+      'TUNISIA': 'Tunisian',
+      'TUNISIAN': 'Tunisian',
+      'MAR': 'Moroccan',
+      '504': 'Moroccan',
+      'MOROCCO': 'Moroccan',
+      'MOROCCAN': 'Moroccan',
+      'DZA': 'Algerian',
+      '012': 'Algerian',
+      'ALGERIA': 'Algerian',
+      'ALGERIAN': 'Algerian',
+      'IRQ': 'Iraqi',
+      '368': 'Iraqi',
+      'IRAQ': 'Iraqi',
+      'IRAQI': 'Iraqi',
+      'IRN': 'Iranian',
+      '364': 'Iranian',
+      'IRAN': 'Iranian',
+      'IRANIAN': 'Iranian',
+      'TUR': 'Turkish',
+      '792': 'Turkish',
+      'TURKEY': 'Turkish',
+      'TURKISH': 'Turkish',
+      'LKA': 'Sri Lankan',
+      '144': 'Sri Lankan',
+      'SRI LANKA': 'Sri Lankan',
+      'SRILANKAN': 'Sri Lankan',
+      'NPL': 'Nepalese',
+      '524': 'Nepalese',
+      'NEPAL': 'Nepalese',
+      'NEPALESE': 'Nepalese',
+      'GBR': 'British',
+      '826': 'British',
+      'UK': 'British',
+      'UNITED KINGDOM': 'British',
+      'BRITISH': 'British',
+      'USA': 'American',
+      '840': 'American',
+      'UNITED STATES': 'American',
+      'AMERICAN': 'American',
+      'CAN': 'Canadian',
+      '124': 'Canadian',
+      'CANADA': 'Canadian',
+      'CANADIAN': 'Canadian',
+      'AUS': 'Australian',
+      '036': 'Australian',
+      'AUSTRALIA': 'Australian',
+      'AUSTRALIAN': 'Australian',
+      'NGA': 'Nigerian',
+      '566': 'Nigerian',
+      'NIGERIA': 'Nigerian',
+      'KEN': 'Kenyan',
+      '404': 'Kenyan',
+      'KENYA': 'Kenyan',
+      'ETH': 'Ethiopian',
+      '231': 'Ethiopian',
+      'ETHIOPIA': 'Ethiopian',
+      'IDN': 'Indonesian',
+      '360': 'Indonesian',
+      'INDONESIA': 'Indonesian',
+      'MYS': 'Malaysian',
+      '458': 'Malaysian',
+      'MALAYSIA': 'Malaysian',
+      'THA': 'Thai',
+      '764': 'Thai',
+      'THAILAND': 'Thai',
+      'CHN': 'Chinese',
+      '156': 'Chinese',
+      'CHINA': 'Chinese',
+      'JPN': 'Japanese',
+      '392': 'Japanese',
+      'JAPAN': 'Japanese',
+      'KOR': 'South Korean',
+      '410': 'South Korean',
+      'KOREA': 'South Korean',
+      'FRA': 'French',
+      '250': 'French',
+      'FRANCE': 'French',
+      'DEU': 'German',
+      '276': 'German',
+      'GERMANY': 'German',
+      'ITA': 'Italian',
+      '380': 'Italian',
+      'ITALY': 'Italian',
+      'ESP': 'Spanish',
+      '724': 'Spanish',
+      'SPAIN': 'Spanish',
+      'RUS': 'Russian',
+      '643': 'Russian',
+      'RUSSIA': 'Russian'
+    };
+
+    // Candidate fields in priority order (CardCountry is intentionally excluded because CardCountry is BAH for all Bahrain-issued cards)
+    const rawVal = this.findFieldValue(
+      raw,
+      'NationalityDescription',
+      'NationalityEnglish',
+      'Nationality',
+      'NationalityDesc',
+      'CountryNameEnglish',
+      'CountryDescription',
+      'ImmigrationNationality',
+      'ImmigrationNationalityDescription',
+      'Country'
+    ) || this.findFieldValue(
+      misc,
+      'NationalityDescription',
+      'NationalityEnglish',
+      'Nationality',
+      'NationalityDesc',
+      'CountryNameEnglish',
+      'CountryDescription',
+      'CountryName',
+      'NationalityCode',
+      'CountryCode',
+      'ImmigrationNationality',
+      'ImmigrationNationalityDescription',
+      'Country'
+    );
+
+    if (rawVal) {
+      const clean = rawVal.trim();
+      const upper = clean.toUpperCase();
+      if (NATIONALITY_MAP[upper]) {
+        return NATIONALITY_MAP[upper];
+      }
+      // If contains slash or separator like "IND / INDIA"
+      if (clean.includes('/') || clean.includes('-')) {
+        const parts = clean.split(/[\/\-]/).map(p => p.trim().toUpperCase());
+        for (const p of parts) {
+          if (NATIONALITY_MAP[p]) return NATIONALITY_MAP[p];
+        }
+      }
+      // If it is a word string
+      if (!/^\d+$/.test(clean) && clean.length >= 3) {
+        return clean.charAt(0).toUpperCase() + clean.slice(1);
+      }
+    }
+
+    return 'Bahraini';
+  }
+
   // Parses raw CIO Smartcard JSON to normalized Clinic Patient model
   parseCardPayload(raw) {
     if (!raw) return null;
@@ -329,34 +562,42 @@ class SmartCardReaderService {
     const misc = raw.MiscellaneousTextData || {};
 
     // CPR Number
-    const cpr = raw.CPR || raw.IdNumber || misc.CPRNO || raw.PersonalNumber || raw.CPRNumber || '';
+    const cpr = this.findFieldValue(raw, 'CPR', 'IdNumber', 'CPRNO', 'PersonalNumber', 'CPRNumber', 'IdentityNumber')
+      || this.findFieldValue(misc, 'CPRNO', 'CPR', 'IdNumber', 'PersonalNumber', 'CPRNumber')
+      || '';
 
     // English Full Name
-    let nameEn = raw.EnglishFullName;
+    let nameEn = this.findFieldValue(raw, 'EnglishFullName', 'FullNameEnglish', 'NameEn')
+      || this.findFieldValue(misc, 'EnglishFullName', 'FullNameEnglish', 'NameEn');
+
     if (!nameEn || nameEn.trim() === '') {
       const parts = [
-        raw.EnglishFirstName || misc.FirstNameEnglish,
-        raw.EnglishSecondName || misc.MiddleName1English,
-        raw.EnglishThirdName || misc.MiddleName2English,
-        raw.EnglishLastName || misc.LastNameEnglish
+        this.findFieldValue(raw, 'EnglishFirstName') || this.findFieldValue(misc, 'FirstNameEnglish'),
+        this.findFieldValue(raw, 'EnglishSecondName') || this.findFieldValue(misc, 'MiddleName1English'),
+        this.findFieldValue(raw, 'EnglishThirdName') || this.findFieldValue(misc, 'MiddleName2English'),
+        this.findFieldValue(raw, 'EnglishLastName') || this.findFieldValue(misc, 'LastNameEnglish')
       ].filter(Boolean);
-      nameEn = parts.length > 0 ? parts.join(' ') : (raw.NameEn || 'Cardholder Name');
+      nameEn = parts.length > 0 ? parts.join(' ') : (this.findFieldValue(raw, 'NameEn') || 'Cardholder Name');
     }
 
     // Arabic Full Name
-    let nameAr = raw.ArabicFullName;
+    let nameAr = this.findFieldValue(raw, 'ArabicFullName', 'FullNameArabic', 'NameAr')
+      || this.findFieldValue(misc, 'ArabicFullName', 'FullNameArabic', 'NameAr');
+
     if (!nameAr || nameAr.trim() === '') {
       const parts = [
-        raw.ArabicFirstName || misc.FirstNameArabic,
-        raw.ArabicSecondName || misc.MiddleName1Arabic,
-        raw.ArabicThirdName || misc.MiddleName2Arabic,
-        raw.ArabicLastName || misc.LastNameArabic
+        this.findFieldValue(raw, 'ArabicFirstName') || this.findFieldValue(misc, 'FirstNameArabic'),
+        this.findFieldValue(raw, 'ArabicSecondName') || this.findFieldValue(misc, 'MiddleName1Arabic'),
+        this.findFieldValue(raw, 'ArabicThirdName') || this.findFieldValue(misc, 'MiddleName2Arabic'),
+        this.findFieldValue(raw, 'ArabicLastName') || this.findFieldValue(misc, 'LastNameArabic')
       ].filter(Boolean);
-      nameAr = parts.length > 0 ? parts.join(' ') : (raw.NameAr || '');
+      nameAr = parts.length > 0 ? parts.join(' ') : (this.findFieldValue(raw, 'NameAr') || '');
     }
 
     // Date of Birth format normalization
-    let rawDob = raw.BirthDate || misc.DateOfBirth || raw.DateOfBirth || '';
+    let rawDob = this.findFieldValue(raw, 'BirthDate', 'DateOfBirth', 'DOB')
+      || this.findFieldValue(misc, 'DateOfBirth', 'BirthDate', 'DOB')
+      || '';
     let formattedDob = '';
     if (rawDob) {
       if (rawDob.includes('/')) {
@@ -369,49 +610,62 @@ class SmartCardReaderService {
         // "19870616" -> "1987-06-16"
         formattedDob = `${rawDob.slice(0, 4)}-${rawDob.slice(4, 6)}-${rawDob.slice(6, 8)}`;
       } else {
-        formattedDob = rawDob;
+        formattedDob = rawDob.slice(0, 10);
       }
     }
 
     // Gender
-    const rawGender = raw.Gender || misc.Gender || '';
-    const gender = (rawGender.toString().toUpperCase().startsWith('F') || rawGender === '2') ? 'FEMALE' : 'MALE';
+    const rawGender = this.findFieldValue(raw, 'Gender', 'Sex')
+      || this.findFieldValue(misc, 'Gender', 'Sex')
+      || '';
+    const gender = (rawGender.toUpperCase().startsWith('F') || rawGender === '2') ? 'FEMALE' : 'MALE';
 
-    // Nationality
-    const nationality = raw.NationalityDescription || (raw.CardCountry === 'BAH' ? 'Bahraini' : (raw.Nationality || 'Bahraini'));
+    // Nationality (Accurately extracted without false BAH -> Bahraini override)
+    const nationality = this.resolveNationality(raw, misc);
 
     // Address
-    const address = raw.AddressEnglish || raw.AddressArabic || [
-      misc.FlatNo ? `Flat ${misc.FlatNo}` : '',
-      misc.BuildingNo ? `Bldg ${misc.BuildingNo}` : '',
-      misc.RoadNo ? `Road ${misc.RoadNo}` : '',
-      misc.BlockNo ? `Block ${misc.BlockNo}` : '',
-      misc.BlockName || '',
-      misc.GovernorateNameEnglish || ''
-    ].filter(Boolean).join(', ') || raw.Address || 'Kingdom of Bahrain';
+    const address = this.findFieldValue(raw, 'AddressEnglish', 'AddressArabic', 'Address')
+      || [
+        this.findFieldValue(misc, 'FlatNo') ? `Flat ${this.findFieldValue(misc, 'FlatNo')}` : '',
+        this.findFieldValue(misc, 'BuildingNo') ? `Bldg ${this.findFieldValue(misc, 'BuildingNo')}` : '',
+        this.findFieldValue(misc, 'RoadNo') ? `Road ${this.findFieldValue(misc, 'RoadNo')}` : '',
+        this.findFieldValue(misc, 'BlockNo') ? `Block ${this.findFieldValue(misc, 'BlockNo')}` : '',
+        this.findFieldValue(misc, 'BlockName') || '',
+        this.findFieldValue(misc, 'GovernorateNameEnglish') || ''
+      ].filter(Boolean).join(', ') || 'Kingdom of Bahrain';
 
     // Phone / Mobile
-    const phone = misc.ContactNo || misc.MobileNumber || raw.TelephoneNumber || raw.MobileNumber || '';
-    const email = misc.Email || raw.EmailAddress || '';
+    const phone = this.findFieldValue(misc, 'ContactNo', 'MobileNumber', 'Phone', 'Telephone')
+      || this.findFieldValue(raw, 'TelephoneNumber', 'MobileNumber', 'PhoneNumber')
+      || '';
+    const email = this.findFieldValue(misc, 'Email', 'EmailAddress')
+      || this.findFieldValue(raw, 'EmailAddress', 'Email')
+      || '';
 
     // Card Expiry Date format normalization
-    let rawExpiry = raw.CardexpiryDate || raw.CardExpiryDate || misc.CardExpiryDate || misc.ExpiryDate || raw.ExpiryDate || raw.CardExpiry || '';
+    let rawExpiry = this.findFieldValue(raw, 'CardexpiryDate', 'CardExpiryDate', 'CardExpiry', 'ExpiryDate', 'DateOfExpiry', 'CardExpirationDate')
+      || this.findFieldValue(misc, 'CardexpiryDate', 'CardExpiryDate', 'CardExpiry', 'ExpiryDate', 'DateOfExpiry', 'CardExpirationDate')
+      || '';
     let formattedExpiry = '';
     if (rawExpiry) {
       if (rawExpiry.includes('/')) {
+        // "12/12/2026" -> "2026-12-12"
         const parts = rawExpiry.split('/');
         if (parts.length === 3) {
           formattedExpiry = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
         }
       } else if (rawExpiry.length === 8 && !rawExpiry.includes('-')) {
+        // "20261212" -> "2026-12-12"
         formattedExpiry = `${rawExpiry.slice(0, 4)}-${rawExpiry.slice(4, 6)}-${rawExpiry.slice(6, 8)}`;
       } else {
-        formattedExpiry = rawExpiry;
+        formattedExpiry = rawExpiry.slice(0, 10);
       }
     }
 
     // Photo Base64
-    let photoBase64 = raw.PhotoB64Encoded || raw.Photo || raw.CardHolderPhoto || null;
+    let photoBase64 = this.findFieldValue(raw, 'PhotoB64Encoded', 'Photo', 'CardHolderPhoto', 'BiometricPhoto')
+      || this.findFieldValue(misc, 'PhotoB64Encoded', 'Photo', 'CardHolderPhoto')
+      || null;
     if (photoBase64 && !photoBase64.startsWith('data:image')) {
       photoBase64 = `data:image/jpeg;base64,${photoBase64}`;
     }
@@ -423,11 +677,11 @@ class SmartCardReaderService {
       dob: formattedDob,
       gender: gender,
       nationality: nationality,
-      blood_group: misc.BloodGroup || raw.BloodGroup || raw.BloodType || 'O+',
+      blood_group: this.findFieldValue(misc, 'BloodGroup', 'BloodType') || this.findFieldValue(raw, 'BloodGroup', 'BloodType') || 'O+',
       phone: phone,
       email: email,
       address: address,
-      passport_number: raw.PassportNumber || misc.PassportNo || '',
+      passport_number: this.findFieldValue(raw, 'PassportNumber', 'PassportNo', 'Passport') || this.findFieldValue(misc, 'PassportNo', 'PassportNumber', 'Passport') || '',
       card_expiry: formattedExpiry,
       cpr_expiry: formattedExpiry,
       photo_base64: photoBase64,

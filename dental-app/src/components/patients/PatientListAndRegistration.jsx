@@ -166,7 +166,9 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
     if (expiry) {
       const today = new Date().toISOString().slice(0, 10);
       if (expiry < today) {
-        showToast(`⚠️ CPR Card is EXPIRED (Expiry Date: ${expiry})`, 'error', 6000);
+        showToast(`⚠️ CPR Card is EXPIRED (Expiry Date: ${formatDate(expiry)})`, 'error', 7000);
+      } else {
+        showToast(`✅ CPR Card is VALID (Expiry Date: ${formatDate(expiry)})`, 'success', 5000);
       }
     }
   };
@@ -487,21 +489,24 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
                 <div className="grid grid-cols-2 gap-2 text-xs py-2 border-y border-slate-100 dark:border-slate-800 my-2">
                   <div>
                     <span className="text-slate-400 text-[10px] font-bold uppercase block">CPR & Expiry</span>
-                    <div className="flex flex-col gap-0.5">
+                    <div className="flex flex-col gap-1 mt-0.5">
                       <span className="font-bold text-slate-800 dark:text-slate-200">
                         {patient.cpr_number || 'N/A'}
                       </span>
-                      {patient.cpr_expiry && (
+                      {patient.cpr_expiry ? (
                         patient.cpr_expiry < new Date().toISOString().slice(0, 10) ? (
-                          <span className="inline-flex items-center gap-1 text-[9px] font-extrabold text-rose-600 dark:text-rose-400">
-                            <AlertTriangle className="w-2.5 h-2.5 shrink-0" />
+                          <span className="inline-flex items-center gap-1 text-[10px] font-black text-rose-700 dark:text-rose-300 bg-rose-100 dark:bg-rose-950/80 border border-rose-300 dark:border-rose-800 px-2 py-0.5 rounded-md shadow-2xs w-fit">
+                            <AlertTriangle className="w-3 h-3 shrink-0 text-rose-600 dark:text-rose-400" />
                             <span>EXPIRED: {formatDate(patient.cpr_expiry)}</span>
                           </span>
                         ) : (
-                          <span className="text-[9px] font-medium text-slate-400">
-                            Exp: {formatDate(patient.cpr_expiry)}
+                          <span className="inline-flex items-center gap-1 text-[10px] font-black text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-800 px-2 py-0.5 rounded-md shadow-2xs w-fit">
+                            <CheckCircle className="w-3 h-3 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                            <span>VALID: {formatDate(patient.cpr_expiry)}</span>
                           </span>
                         )
+                      ) : (
+                        <span className="text-[10px] text-slate-400">No Expiry Date</span>
                       )}
                     </div>
                   </div>
@@ -786,8 +791,8 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
                       </span>
                     )}
                     {formCprExpiry && !isCprExpired && (
-                      <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1">
-                        <CheckCircle className="w-3 h-3 text-emerald-500" /> Valid Card
+                      <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1">
+                        <CheckCircle className="w-3 h-3 text-emerald-500" /> VALID
                       </span>
                     )}
                   </div>
@@ -798,12 +803,20 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
                     className={`w-full px-3.5 py-2 rounded-xl text-xs font-bold transition ${
                       isCprExpired
                         ? 'bg-rose-50 dark:bg-rose-950/40 border-2 border-rose-500 text-rose-900 dark:text-rose-200 ring-2 ring-rose-500/20'
+                        : formCprExpiry
+                        ? 'bg-emerald-50 dark:bg-emerald-950/40 border-2 border-emerald-500 text-emerald-900 dark:text-emerald-200 ring-2 ring-emerald-500/20'
                         : 'bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white'
                     }`}
                   />
                   {formCprExpiry && isCprExpired && (
-                    <div className="mt-1.5 px-2.5 py-1 rounded-lg bg-rose-100 dark:bg-rose-950 border border-rose-300 dark:border-rose-900 flex items-center justify-between text-[11px] font-bold text-rose-700 dark:text-rose-300">
-                      <span>⚠️ Card Expired on:</span>
+                    <div className="mt-1.5 px-2.5 py-1.5 rounded-lg bg-rose-100 dark:bg-rose-950 border border-rose-300 dark:border-rose-900 flex items-center justify-between text-[11px] font-extrabold text-rose-700 dark:text-rose-300 shadow-2xs">
+                      <span className="flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0" /> Card EXPIRED on:</span>
+                      <span className="font-mono">{formatDate(formCprExpiry)}</span>
+                    </div>
+                  )}
+                  {formCprExpiry && !isCprExpired && (
+                    <div className="mt-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-950 border border-emerald-300 dark:border-emerald-900 flex items-center justify-between text-[11px] font-extrabold text-emerald-700 dark:text-emerald-300 shadow-2xs">
+                      <span className="flex items-center gap-1"><CheckCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" /> Card VALID until:</span>
                       <span className="font-mono">{formatDate(formCprExpiry)}</span>
                     </div>
                   )}
