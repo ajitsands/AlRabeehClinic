@@ -48,10 +48,17 @@ export function AppProvider({ children }) {
   const [activeUserRole, setActiveUserRole] = useState('ADMIN'); // 'ADMIN' | 'DOCTOR' | 'RECEPTIONIST'
   const [theme, setTheme] = useState('light');
   
+  // Multi-Branch State
+  const [branches, setBranches] = useState([]);
+  const [activeBranchId, setActiveBranchIdState] = useState(
+    localStorage.getItem('clinic_active_branch') || 'branch-mnm'
+  );
+
   // Settings state with Operating Hours and Break Time
   const [settings, setSettings] = useState({
     clinic_name: 'Al Rabeesh Dental Specialty Center',
     clinic_tagline: 'Excellence in Dental Care & Aesthetic Dentistry',
+    default_branch_id: 'branch-mnm',
     theme: 'light',
     timezone: 'Asia/Bahrain',
     date_format: 'DD/MM/YYYY',
@@ -91,10 +98,79 @@ export function AppProvider({ children }) {
     }, duration);
   };
 
-  // Initialize DB and Load Settings
+  // Active Branch Computed Object
+  const activeBranch = branches.find(b => b.id === activeBranchId) || branches[0] || {
+    id: 'branch-mnm',
+    code: 'MNM',
+    name: 'Manama Flagship Center',
+    prefix: 'ARB-MNM',
+    color: '#2563EB'
+  };
+
+  // Change Active Branch
+  const changeActiveBranch = (branchId) => {
+    setActiveBranchIdState(branchId);
+    localStorage.setItem('clinic_active_branch', branchId);
+    const branch = branches.find(b => b.id === branchId);
+    if (branch) {
+      showToast(`Switched active location to: ${branch.name} (${branch.code})`, 'info');
+    }
+  };
+
+  // Load and refresh branches from IndexedDB
+  const refreshBranches = async () => {
+    try {
+      const allBranches = await db.branches.toArray();
+      setBranches(allBranches);
+      if (allBranches.length > 0 && !allBranches.some(b => b.id === activeBranchId)) {
+        setActiveBranchIdState(allBranches[0].id);
+      }
+    } catch (e) {
+      console.error('Failed to load branches:', e);
+    }
+  };
+
+  // Add or update branch
+  const saveBranch = async (branchData) => {
+    const isNew = !branchData.id;
+    const branchId = branchData.id || `branch-${Date.now()}`;
+    const cleanBranch = {
+      ...branchData,
+      id: branchId,
+      code: (branchData.code || 'BRN').toUpperCase().trim(),
+      prefix: (branchData.prefix || `ARB-${branchData.code}`).toUpperCase().trim(),
+      is_active: branchData.is_active !== undefined ? branchData.is_active : true
+    };
+
+    await db.branches.put(cleanBranch);
+    await syncEngine.queueChange('branches', branchId, isNew ? 'INSERT' : 'UPDATE', cleanBranch);
+    await refreshBranches();
+    showToast(`Branch ${cleanBranch.name} saved successfully`, 'success');
+  };
+
+  // Generate Collision-Free Smart Branch-Prefixed File Number (e.g. ARB-MNM-26-0005)
+  const generateBranchFileNumber = async (branchId = activeBranchId) => {
+    try {
+      const targetBranch = branches.find(b => b.id === branchId) || activeBranch;
+      const prefix = targetBranch?.prefix || `ARB-${targetBranch?.code || 'MNM'}`;
+      const yearShort = new Date().getFullYear().toString().slice(-2); // e.g. "26"
+
+      // Count existing patients for this branch prefix
+      const count = await db.patients.where('home_branch_id').equals(branchId).count();
+      const nextSeq = String(count + 1).padStart(4, '0');
+      return `${prefix}-${yearShort}-${nextSeq}`;
+    } catch (e) {
+      const yearShort = new Date().getFullYear().toString().slice(-2);
+      return `ARB-MNM-${yearShort}-${String(Date.now()).slice(-4)}`;
+    }
+  };
+
+  // Initialize DB, Load Settings and Branches
   useEffect(() => {
     async function setup() {
       await initializeDatabase();
+      await refreshBranches();
+
       const savedSettings = await db.settings.get('clinic_settings');
       if (savedSettings) {
         setSettings(savedSettings);
@@ -103,6 +179,11 @@ export function AppProvider({ children }) {
           document.documentElement.classList.add('dark');
         } else {
           document.documentElement.classList.remove('dark');
+        }
+
+        // Set default branch if not set in local storage
+        if (!localStorage.getItem('clinic_active_branch') && savedSettings.default_branch_id) {
+          setActiveBranchIdState(savedSettings.default_branch_id);
         }
       }
 
@@ -258,6 +339,13 @@ export function AppProvider({ children }) {
         setSelectedPatientId,
         activeUserRole,
         setActiveUserRole,
+        branches,
+        activeBranchId,
+        activeBranch,
+        setActiveBranchId: changeActiveBranch,
+        refreshBranches,
+        saveBranch,
+        generateBranchFileNumber,
         theme,
         toggleTheme,
         settings,

@@ -28,15 +28,21 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
     showToast, 
     triggerSmartCardRead, 
     lastScannedCard, 
-    setLastScannedCard 
+    setLastScannedCard,
+    activeBranchId,
+    activeBranch,
+    branches,
+    generateBranchFileNumber
   } = useApp();
 
   const [patients, setPatients] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterGender, setFilterGender] = useState('ALL');
+  const [filterBranch, setFilterBranch] = useState('ALL');
   const [isReadingCard, setIsReadingCard] = useState(false);
 
   // Form State for Patient Registration
+  const [formHomeBranchId, setFormHomeBranchId] = useState(activeBranchId || 'branch-mnm');
   const [formFileNumber, setFormFileNumber] = useState('');
   const [formCpr, setFormCpr] = useState('');
   const [formNameEn, setFormNameEn] = useState('');
@@ -65,29 +71,31 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
     loadPatients();
   }, []);
 
-  // Auto-generate next Patient File ID
-  const generateNextFileNumber = async () => {
-    const count = await db.patients.count();
-    const year = new Date().getFullYear();
-    const nextSeq = String(count + 1).padStart(4, '0');
-    return `PAT-${year}-${nextSeq}`;
+  // Update target branch and recalculate next File ID when branch changes in form
+  const handleBranchChangeInForm = async (targetBranchId) => {
+    setFormHomeBranchId(targetBranchId);
+    const nextId = await generateBranchFileNumber(targetBranchId);
+    setFormFileNumber(nextId);
   };
 
   // Open modal & reset or fill
   const handleOpenRegisterModal = async (initialData = null) => {
-    const nextId = await generateNextFileNumber();
+    const branchToUse = activeBranchId || 'branch-mnm';
+    setFormHomeBranchId(branchToUse);
+    const nextId = await generateBranchFileNumber(branchToUse);
     setFormFileNumber(nextId);
 
     if (initialData) {
       populateFormWithCardData(initialData);
     } else {
-      resetForm(nextId);
+      resetForm(nextId, branchToUse);
     }
     setIsRegisterModalOpen(true);
   };
 
-  const resetForm = (fileNum) => {
-    setFormFileNumber(fileNum || `PAT-${new Date().getFullYear()}-0001`);
+  const resetForm = (fileNum, branchId = activeBranchId) => {
+    setFormHomeBranchId(branchId);
+    setFormFileNumber(fileNum || `ARB-MNM-${new Date().getFullYear().toString().slice(-2)}-0001`);
     setFormCpr('');
     setFormNameEn('');
     setFormNameAr('');
@@ -181,6 +189,8 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
       photo_base64: formPhoto || null,
       allergies: formAllergies,
       medical_alerts: formMedicalAlerts,
+      home_branch_id: formHomeBranchId || activeBranchId,
+      created_at_branch_id: activeBranchId,
       source: formSource,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
@@ -211,10 +221,13 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
     }
   };
 
-  // Filter Patients
+  // Filter Patients Globally or by Branch
   const filteredPatients = patients.filter(p => {
     const matchGender = filterGender === 'ALL' || p.gender === filterGender;
     if (!matchGender) return false;
+
+    const matchBranch = filterBranch === 'ALL' || p.home_branch_id === filterBranch;
+    if (!matchBranch) return false;
 
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
@@ -232,14 +245,14 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
     <div className="space-y-4">
       
       {/* Search Bar & Action Header */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col lg:flex-row items-center justify-between gap-4">
         
-        {/* Fast Multi-Field Search */}
+        {/* Fast Global Multi-Field Search */}
         <div className="relative flex-1 w-full max-w-xl">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Search by CPR / National ID, Mobile Number, Name (Arabic/English), File No..."
+            placeholder="Global Search across ALL branches by CPR, Mobile, Name (Ar/En), File No..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 rounded-xl text-xs sm:text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -254,12 +267,28 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
           )}
         </div>
 
-        {/* Gender Filter & Actions */}
-        <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+        {/* Branch Filter, Gender Filter & Actions */}
+        <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto justify-end">
+          
+          {/* Branch Filter Selector */}
+          <select
+            value={filterBranch}
+            onChange={(e) => setFilterBranch(e.target.value)}
+            className="bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-bold py-2.5 px-3 rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-none cursor-pointer"
+          >
+            <option value="ALL">🌐 All Branches ({patients.length})</option>
+            {branches.map(b => (
+              <option key={b.id} value={b.id}>
+                📍 {b.name.replace('Al Rabeesh ', '')} ({patients.filter(p => p.home_branch_id === b.id).length})
+              </option>
+            ))}
+          </select>
+
+          {/* Gender Filter */}
           <select
             value={filterGender}
             onChange={(e) => setFilterGender(e.target.value)}
-            className="bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-semibold py-2.5 px-3 rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-none"
+            className="bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-semibold py-2.5 px-3 rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-none cursor-pointer"
           >
             <option value="ALL">All Genders</option>
             <option value="MALE">Male</option>
@@ -268,7 +297,7 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
 
           <button
             onClick={() => handleOpenRegisterModal()}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold shadow-md shadow-blue-500/20 transition-all"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold shadow-md shadow-blue-500/20 transition-all cursor-pointer shrink-0"
           >
             <Plus className="w-4 h-4" />
             <span>New Patient Registration</span>
@@ -279,90 +308,102 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
 
       {/* Patients Grid / Directory - Exactly 4 Cards in One Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-4 gap-3.5">
-        {filteredPatients.map((patient) => (
-          <div
-            key={patient.id}
-            onClick={() => onSelectPatient(patient.id)}
-            className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-blue-400 dark:hover:border-blue-600 cursor-pointer transition-all flex flex-col justify-between group"
-          >
-            <div>
-              {/* Header: Photo, Name, CPR, File Number */}
-              <div className="flex items-start gap-3.5 mb-3">
-                <img
-                  src={patient.photo_base64 || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80'}
-                  alt={patient.full_name_en}
-                  className="w-14 h-14 rounded-2xl object-cover border-2 border-slate-100 dark:border-slate-800 shadow-xs shrink-0"
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-1">
-                    <span className="px-2.5 py-1 text-xs font-black tracking-wider uppercase bg-blue-100 dark:bg-blue-900/70 text-blue-800 dark:text-blue-200 rounded-lg border border-blue-300 dark:border-blue-700 shadow-xs">
-                      {patient.file_number}
-                    </span>
-                    {patient.source === 'CARD_READER' && (
-                      <span className="flex items-center gap-1 text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded">
-                        <CheckCircle className="w-2.5 h-2.5" /> CPR Verified
+        {filteredPatients.map((patient) => {
+          const patientBranch = branches.find(b => b.id === patient.home_branch_id);
+          return (
+            <div
+              key={patient.id}
+              onClick={() => onSelectPatient(patient.id)}
+              className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-blue-400 dark:hover:border-blue-600 cursor-pointer transition-all flex flex-col justify-between group"
+            >
+              <div>
+                {/* Header: Photo, Name, CPR, File Number & Branch Badge */}
+                <div className="flex items-start gap-3.5 mb-3">
+                  <img
+                    src={patient.photo_base64 || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80'}
+                    alt={patient.full_name_en}
+                    className="w-14 h-14 rounded-2xl object-cover border-2 border-slate-100 dark:border-slate-800 shadow-xs shrink-0"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="px-2.5 py-1 text-xs font-black tracking-wider uppercase bg-blue-100 dark:bg-blue-900/70 text-blue-800 dark:text-blue-200 rounded-lg border border-blue-300 dark:border-blue-700 shadow-xs">
+                        {patient.file_number}
                       </span>
+                      {patient.source === 'CARD_READER' && (
+                        <span className="flex items-center gap-1 text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded">
+                          <CheckCircle className="w-2.5 h-2.5" /> CPR
+                        </span>
+                      )}
+                    </div>
+
+                    <h3 className="font-bold text-sm text-slate-900 dark:text-white truncate mt-1">
+                      {patient.full_name_en}
+                    </h3>
+                    {patient.full_name_ar && (
+                      <p className="text-xs text-slate-500 dark:text-slate-400 font-arabic truncate">
+                        {patient.full_name_ar}
+                      </p>
                     )}
+
+                    {/* Home Branch Chip */}
+                    <div className="mt-1 flex items-center gap-1 text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                      <div 
+                        className="w-2 h-2 rounded-full"
+                        style={{ backgroundColor: patientBranch?.color || '#3B82F6' }}
+                      />
+                      <span className="truncate">{patientBranch?.name?.replace('Al Rabeesh ', '') || 'Manama'}</span>
+                    </div>
                   </div>
-
-                  <h3 className="font-bold text-sm text-slate-900 dark:text-white truncate mt-1">
-                    {patient.full_name_en}
-                  </h3>
-                  {patient.full_name_ar && (
-                    <p className="text-xs text-slate-500 dark:text-slate-400 font-arabic truncate">
-                      {patient.full_name_ar}
-                    </p>
-                  )}
                 </div>
+
+                {/* Details Badges */}
+                <div className="grid grid-cols-2 gap-2 text-xs py-2 border-y border-slate-100 dark:border-slate-800 my-2">
+                  <div>
+                    <span className="text-slate-400 text-[10px] font-bold uppercase block">CPR Number</span>
+                    <span className="font-bold text-slate-800 dark:text-slate-200">
+                      {patient.cpr_number || 'N/A'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 text-[10px] font-bold uppercase block">Mobile Phone</span>
+                    <span className="font-bold text-slate-800 dark:text-slate-200">
+                      {patient.phone}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 text-[10px] font-bold uppercase block">Nationality & DOB</span>
+                    <span className="text-slate-600 dark:text-slate-300">
+                      {patient.nationality || 'Bahraini'} • {formatDate(patient.dob)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 text-[10px] font-bold uppercase block">Blood Group</span>
+                    <span className="font-bold text-rose-600 dark:text-rose-400">
+                      {patient.blood_group || 'O+'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Medical Alerts / Allergies Alert */}
+                {(patient.allergies || patient.medical_alerts) && (
+                  <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/60 text-[11px] text-amber-800 dark:text-amber-300 flex items-start gap-1.5 my-2">
+                    <ShieldAlert className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-600" />
+                    <span className="truncate">
+                      {patient.allergies ? `Allergy: ${patient.allergies}` : patient.medical_alerts}
+                    </span>
+                  </div>
+                )}
               </div>
 
-              {/* Details Badges */}
-              <div className="grid grid-cols-2 gap-2 text-xs py-2 border-y border-slate-100 dark:border-slate-800 my-2">
-                <div>
-                  <span className="text-slate-400 text-[10px] font-bold uppercase block">CPR Number</span>
-                  <span className="font-bold text-slate-800 dark:text-slate-200">
-                    {patient.cpr_number || 'N/A'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400 text-[10px] font-bold uppercase block">Mobile Phone</span>
-                  <span className="font-bold text-slate-800 dark:text-slate-200">
-                    {patient.phone}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400 text-[10px] font-bold uppercase block">Nationality & DOB</span>
-                  <span className="text-slate-600 dark:text-slate-300">
-                    {patient.nationality || 'Bahraini'} • {formatDate(patient.dob)}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400 text-[10px] font-bold uppercase block">Blood Group</span>
-                  <span className="font-bold text-rose-600 dark:text-rose-400">
-                    {patient.blood_group || 'O+'}
-                  </span>
-                </div>
+              {/* Bottom Actions */}
+              <div className="pt-3 flex items-center justify-between text-xs font-semibold text-blue-600 dark:text-blue-400 border-t border-slate-100 dark:border-slate-800">
+                <span>View Full File & Clinical Vitals</span>
+                <ChevronRight className="w-4 h-4" />
               </div>
 
-              {/* Medical Alerts / Allergies Alert */}
-              {(patient.allergies || patient.medical_alerts) && (
-                <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/60 text-[11px] text-amber-800 dark:text-amber-300 flex items-start gap-1.5 my-2">
-                  <ShieldAlert className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-600" />
-                  <span className="truncate">
-                    {patient.allergies ? `Allergy: ${patient.allergies}` : patient.medical_alerts}
-                  </span>
-                </div>
-              )}
             </div>
-
-            {/* Bottom Actions */}
-            <div className="pt-3 flex items-center justify-between text-xs font-semibold text-blue-600 dark:text-blue-400 border-t border-slate-100 dark:border-slate-800">
-              <span>View Full File & Clinical Vitals</span>
-              <ChevronRight className="w-4 h-4" />
-            </div>
-
-          </div>
-        ))}
+          );
+        })}
 
         {filteredPatients.length === 0 && (
           <div className="col-span-full p-12 text-center bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800">
@@ -394,8 +435,26 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
                 </div>
               </div>
 
-              {/* Prominent Large File Number Badge */}
+              {/* Prominent Large File Number Badge & Branch Selector */}
               <div className="flex items-center gap-3 self-end sm:self-auto">
+                {/* Branch Selection Dropdown */}
+                <div className="flex flex-col">
+                  <label className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-0.5">
+                    Registering Branch
+                  </label>
+                  <select
+                    value={formHomeBranchId}
+                    onChange={(e) => handleBranchChangeInForm(e.target.value)}
+                    className="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-xs font-bold py-1.5 px-3 rounded-xl border border-slate-300 dark:border-slate-700 cursor-pointer focus:ring-2 focus:ring-blue-500"
+                  >
+                    {branches.map(b => (
+                      <option key={b.id} value={b.id}>
+                        📍 {b.name.replace('Al Rabeesh ', '')} ({b.prefix})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <div className="flex flex-col sm:items-end">
                   <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 dark:text-slate-500">
                     Patient File ID
@@ -409,7 +468,7 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
                 <button
                   type="button"
                   onClick={() => setIsRegisterModalOpen(false)}
-                  className="p-2.5 rounded-2xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                  className="p-2.5 rounded-2xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
                 >
                   <X className="w-6 h-6" />
                 </button>

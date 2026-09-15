@@ -19,12 +19,36 @@ CREATE TABLE IF NOT EXISTS `system_settings` (
     `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
--- 2. Users & Staff Roles Table
+-- 2. Branches Table (Multi-Branch Clinic Network)
+CREATE TABLE IF NOT EXISTS `branches` (
+    `id` VARCHAR(50) PRIMARY KEY,
+    `name` VARCHAR(150) NOT NULL,
+    `code` VARCHAR(20) NOT NULL UNIQUE,
+    `prefix` VARCHAR(20) NOT NULL UNIQUE,
+    `address` TEXT NULL,
+    `phone` VARCHAR(30) NULL,
+    `color` VARCHAR(20) NOT NULL DEFAULT '#2563EB',
+    `is_active` TINYINT(1) NOT NULL DEFAULT 1,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- Seed Default Branches
+INSERT INTO `branches` (`id`, `name`, `code`, `prefix`, `address`, `phone`, `color`, `is_active`)
+VALUES
+    ('branch-mnm', 'Al Rabeesh Manama Branch', 'MNM', 'ARB-MNM', 'Building 124, Road 3801, Manama Center', '+973 1722 3344', '#2563EB', 1),
+    ('branch-rfa', 'Al Rabeesh Riffa Branch', 'RFA', 'ARB-RFA', 'Villa 45, Avenue 12, East Riffa', '+973 1777 5566', '#10B981', 1),
+    ('branch-sef', 'Al Rabeesh Seef Branch', 'SEF', 'ARB-SEF', 'Seef Mall Medical Tower, 4th Floor', '+973 1758 9900', '#8B5CF6', 1),
+    ('branch-muh', 'Al Rabeesh Muharraq Branch', 'MUH', 'ARB-MUH', 'Road 2104, Block 221, Muharraq', '+973 1734 1122', '#F59E0B', 1)
+ON DUPLICATE KEY UPDATE `name` = VALUES(`name`);
+
+-- 3. Users & Staff Roles Table
 CREATE TABLE IF NOT EXISTS `users` (
     `id` VARCHAR(36) PRIMARY KEY,
     `username` VARCHAR(50) UNIQUE NOT NULL,
     `password_hash` VARCHAR(255) NOT NULL,
     `full_name` VARCHAR(100) NOT NULL,
+    `branch_id` VARCHAR(50) NULL,
     `role` ENUM('ADMIN', 'DOCTOR', 'RECEPTIONIST', 'NURSE') NOT NULL DEFAULT 'RECEPTIONIST',
     `email` VARCHAR(100) NULL,
     `phone` VARCHAR(20) NULL,
@@ -33,12 +57,13 @@ CREATE TABLE IF NOT EXISTS `users` (
     `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
--- 3. Doctors Table
+-- 4. Doctors Table
 CREATE TABLE IF NOT EXISTS `doctors` (
     `id` VARCHAR(36) PRIMARY KEY,
     `name` VARCHAR(100) NOT NULL,
     `specialty` VARCHAR(100) NOT NULL DEFAULT 'General Dental Surgeon',
     `qualification` VARCHAR(100) NOT NULL,
+    `primary_branch_id` VARCHAR(50) NOT NULL DEFAULT 'branch-mnm',
     `room_number` VARCHAR(20) NOT NULL,
     `chair_number` VARCHAR(20) NOT NULL,
     `phone` VARCHAR(20) NULL,
@@ -50,10 +75,11 @@ CREATE TABLE IF NOT EXISTS `doctors` (
     `slot_duration_mins` INT NOT NULL DEFAULT 30,
     `is_active` TINYINT(1) NOT NULL DEFAULT 1,
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX `idx_doc_branch` (`primary_branch_id`)
 ) ENGINE=InnoDB;
 
--- 4. Dental Services Catalog Table
+-- 5. Dental Services Catalog Table
 CREATE TABLE IF NOT EXISTS `dental_services` (
     `id` VARCHAR(36) PRIMARY KEY,
     `name` VARCHAR(100) NOT NULL,
@@ -67,11 +93,13 @@ CREATE TABLE IF NOT EXISTS `dental_services` (
     `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
--- 5. Patients Table (Supports Smart Card Reader Data & Arabic/English names)
+-- 6. Patients Table (Supports Smart Card Reader Data & Global Access with Branch Numbering)
 CREATE TABLE IF NOT EXISTS `patients` (
     `id` VARCHAR(36) PRIMARY KEY,
     `file_number` VARCHAR(30) UNIQUE NOT NULL,
     `cpr_number` VARCHAR(30) NULL,
+    `home_branch_id` VARCHAR(50) NOT NULL DEFAULT 'branch-mnm',
+    `created_at_branch_id` VARCHAR(50) NOT NULL DEFAULT 'branch-mnm',
     `full_name_en` VARCHAR(150) NOT NULL,
     `full_name_ar` VARCHAR(150) NULL,
     `phone` VARCHAR(30) NOT NULL,
@@ -92,10 +120,11 @@ CREATE TABLE IF NOT EXISTS `patients` (
     `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX `idx_cpr` (`cpr_number`),
     INDEX `idx_phone` (`phone`),
-    INDEX `idx_name` (`full_name_en`)
+    INDEX `idx_name` (`full_name_en`),
+    INDEX `idx_home_branch` (`home_branch_id`)
 ) ENGINE=InnoDB;
 
--- 6. Patient Vitals Table
+-- 7. Patient Vitals Table
 CREATE TABLE IF NOT EXISTS `patient_vitals` (
     `id` VARCHAR(36) PRIMARY KEY,
     `patient_id` VARCHAR(36) NOT NULL,
@@ -114,7 +143,7 @@ CREATE TABLE IF NOT EXISTS `patient_vitals` (
     FOREIGN KEY (`patient_id`) REFERENCES `patients`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- 7. Patient Clinical Attachments Table (Up to 100MB File Support)
+-- 8. Patient Clinical Attachments Table (Up to 100MB File Support)
 CREATE TABLE IF NOT EXISTS `patient_attachments` (
     `id` VARCHAR(36) PRIMARY KEY,
     `patient_id` VARCHAR(36) NOT NULL,
@@ -132,9 +161,10 @@ CREATE TABLE IF NOT EXISTS `patient_attachments` (
     FOREIGN KEY (`patient_id`) REFERENCES `patients`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- 8. Appointments Table (Multi-Slot Booking Engine)
+-- 9. Appointments Table (Multi-Branch & Multi-Slot Booking Engine)
 CREATE TABLE IF NOT EXISTS `appointments` (
     `id` VARCHAR(36) PRIMARY KEY,
+    `branch_id` VARCHAR(50) NOT NULL DEFAULT 'branch-mnm',
     `patient_id` VARCHAR(36) NOT NULL,
     `doctor_id` VARCHAR(36) NOT NULL,
     `service_id` VARCHAR(36) NULL,
@@ -152,10 +182,11 @@ CREATE TABLE IF NOT EXISTS `appointments` (
     `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (`patient_id`) REFERENCES `patients`(`id`) ON DELETE CASCADE,
     FOREIGN KEY (`doctor_id`) REFERENCES `doctors`(`id`) ON DELETE CASCADE,
-    INDEX `idx_app_date_doc` (`appointment_date`, `doctor_id`)
+    INDEX `idx_app_date_doc` (`appointment_date`, `doctor_id`),
+    INDEX `idx_app_branch` (`branch_id`, `appointment_date`)
 ) ENGINE=InnoDB;
 
--- 9. Offline Outbox Sync Log Table
+-- 10. Offline Outbox Sync Log Table
 CREATE TABLE IF NOT EXISTS `sync_logs` (
     `id` VARCHAR(36) PRIMARY KEY,
     `client_device_id` VARCHAR(100) NOT NULL,

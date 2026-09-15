@@ -52,12 +52,40 @@ if ($method === 'POST' && $action === 'push') {
         $payload = $item['payload'];
 
         try {
-            if ($entityType === 'patients') {
+            if ($entityType === 'branches') {
                 if ($operation === 'INSERT' || $operation === 'UPDATE') {
                     $stmt = $db->prepare("
-                        INSERT INTO patients (id, file_number, cpr_number, full_name_en, full_name_ar, phone, email, dob, gender, nationality, blood_group, address, photo_base64, allergies, medical_alerts, source, updated_at)
-                        VALUES (:id, :file_number, :cpr_number, :full_name_en, :full_name_ar, :phone, :email, :dob, :gender, :nationality, :blood_group, :address, :photo_base64, :allergies, :medical_alerts, :source, NOW())
+                        INSERT INTO branches (id, name, code, prefix, address, phone, color, is_active, updated_at)
+                        VALUES (:id, :name, :code, :prefix, :address, :phone, :color, :is_active, NOW())
                         ON DUPLICATE KEY UPDATE
+                            name = VALUES(name),
+                            code = VALUES(code),
+                            prefix = VALUES(prefix),
+                            address = VALUES(address),
+                            phone = VALUES(phone),
+                            color = VALUES(color),
+                            is_active = VALUES(is_active),
+                            updated_at = NOW()
+                    ");
+                    $stmt->execute([
+                        ':id' => $payload['id'],
+                        ':name' => $payload['name'],
+                        ':code' => $payload['code'],
+                        ':prefix' => $payload['prefix'],
+                        ':address' => $payload['address'] ?? null,
+                        ':phone' => $payload['phone'] ?? null,
+                        ':color' => $payload['color'] ?? '#2563EB',
+                        ':is_active' => isset($payload['is_active']) ? ($payload['is_active'] ? 1 : 0) : 1
+                    ]);
+                }
+            } elseif ($entityType === 'patients') {
+                if ($operation === 'INSERT' || $operation === 'UPDATE') {
+                    $stmt = $db->prepare("
+                        INSERT INTO patients (id, file_number, cpr_number, home_branch_id, created_at_branch_id, full_name_en, full_name_ar, phone, email, dob, gender, nationality, blood_group, address, photo_base64, allergies, medical_alerts, source, updated_at)
+                        VALUES (:id, :file_number, :cpr_number, :home_branch_id, :created_at_branch_id, :full_name_en, :full_name_ar, :phone, :email, :dob, :gender, :nationality, :blood_group, :address, :photo_base64, :allergies, :medical_alerts, :source, NOW())
+                        ON DUPLICATE KEY UPDATE
+                            home_branch_id = VALUES(home_branch_id),
+                            created_at_branch_id = VALUES(created_at_branch_id),
                             full_name_en = VALUES(full_name_en),
                             full_name_ar = VALUES(full_name_ar),
                             phone = VALUES(phone),
@@ -72,6 +100,8 @@ if ($method === 'POST' && $action === 'push') {
                         ':id' => $payload['id'],
                         ':file_number' => $payload['file_number'],
                         ':cpr_number' => $payload['cpr_number'] ?? null,
+                        ':home_branch_id' => $payload['home_branch_id'] ?? 'branch-mnm',
+                        ':created_at_branch_id' => $payload['created_at_branch_id'] ?? 'branch-mnm',
                         ':full_name_en' => $payload['full_name_en'],
                         ':full_name_ar' => $payload['full_name_ar'] ?? null,
                         ':phone' => $payload['phone'],
@@ -90,9 +120,10 @@ if ($method === 'POST' && $action === 'push') {
             } elseif ($entityType === 'appointments') {
                 if ($operation === 'INSERT' || $operation === 'UPDATE') {
                     $stmt = $db->prepare("
-                        INSERT INTO appointments (id, patient_id, doctor_id, service_id, appointment_date, start_time, end_time, slot_count, duration_mins, status, chief_complaint, notes, estimated_fee, updated_at)
-                        VALUES (:id, :patient_id, :doctor_id, :service_id, :appointment_date, :start_time, :end_time, :slot_count, :duration_mins, :status, :chief_complaint, :notes, :estimated_fee, NOW())
+                        INSERT INTO appointments (id, branch_id, patient_id, doctor_id, service_id, appointment_date, start_time, end_time, slot_count, duration_mins, status, chief_complaint, notes, estimated_fee, updated_at)
+                        VALUES (:id, :branch_id, :patient_id, :doctor_id, :service_id, :appointment_date, :start_time, :end_time, :slot_count, :duration_mins, :status, :chief_complaint, :notes, :estimated_fee, NOW())
                         ON DUPLICATE KEY UPDATE
+                            branch_id = VALUES(branch_id),
                             appointment_date = VALUES(appointment_date),
                             start_time = VALUES(start_time),
                             end_time = VALUES(end_time),
@@ -106,6 +137,7 @@ if ($method === 'POST' && $action === 'push') {
                     ");
                     $stmt->execute([
                         ':id' => $payload['id'],
+                        ':branch_id' => $payload['branch_id'] ?? 'branch-mnm',
                         ':patient_id' => $payload['patient_id'],
                         ':doctor_id' => $payload['doctor_id'],
                         ':service_id' => $payload['service_id'] ?? null,
@@ -163,12 +195,13 @@ if ($method === 'POST' && $action === 'push') {
             } elseif ($entityType === 'doctors') {
                 if ($operation === 'INSERT' || $operation === 'UPDATE') {
                     $stmt = $db->prepare("
-                        INSERT INTO doctors (id, name, specialty, qualification, room_number, chair_number, phone, email, photo_url, color_tag, start_time, end_time, slot_duration_mins, is_active, updated_at)
-                        VALUES (:id, :name, :specialty, :qualification, :room_number, :chair_number, :phone, :email, :photo_url, :color_tag, :start_time, :end_time, :slot_duration_mins, :is_active, NOW())
+                        INSERT INTO doctors (id, name, specialty, qualification, primary_branch_id, room_number, chair_number, phone, email, photo_url, color_tag, start_time, end_time, slot_duration_mins, is_active, updated_at)
+                        VALUES (:id, :name, :specialty, :qualification, :primary_branch_id, :room_number, :chair_number, :phone, :email, :photo_url, :color_tag, :start_time, :end_time, :slot_duration_mins, :is_active, NOW())
                         ON DUPLICATE KEY UPDATE
                             name = VALUES(name),
                             specialty = VALUES(specialty),
                             qualification = VALUES(qualification),
+                            primary_branch_id = VALUES(primary_branch_id),
                             room_number = VALUES(room_number),
                             chair_number = VALUES(chair_number),
                             phone = VALUES(phone),
@@ -186,6 +219,7 @@ if ($method === 'POST' && $action === 'push') {
                         ':name' => $payload['name'],
                         ':specialty' => $payload['specialty'] ?? 'General Dental Surgeon',
                         ':qualification' => $payload['qualification'] ?? 'BDS',
+                        ':primary_branch_id' => $payload['primary_branch_id'] ?? 'branch-mnm',
                         ':room_number' => $payload['room_number'] ?? 'Room 1',
                         ':chair_number' => $payload['chair_number'] ?? 'Chair 1',
                         ':phone' => $payload['phone'] ?? null,
@@ -292,6 +326,7 @@ if ($method === 'GET' && $action === 'pull') {
     // Pull changes from MySQL to client
     $since = isset($_GET['since']) ? $_GET['since'] : '1970-01-01 00:00:00';
 
+    $branches = $db->query("SELECT * FROM branches WHERE updated_at >= '$since'")->fetchAll();
     $patients = $db->query("SELECT * FROM patients WHERE updated_at >= '$since'")->fetchAll();
     $appointments = $db->query("SELECT * FROM appointments WHERE updated_at >= '$since'")->fetchAll();
     $doctors = $db->query("SELECT * FROM doctors WHERE updated_at >= '$since'")->fetchAll();
@@ -301,6 +336,7 @@ if ($method === 'GET' && $action === 'pull') {
         'success' => true,
         'serverTime' => date('Y-m-d H:i:s'),
         'data' => [
+            'branches' => $branches,
             'patients' => $patients,
             'appointments' => $appointments,
             'doctors' => $doctors,

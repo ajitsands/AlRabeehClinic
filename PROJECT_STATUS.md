@@ -61,7 +61,7 @@
 - **Git Repo Optimization**: Large installer binaries excluded via `.gitignore` (`DevelopSupportFilesFolder/`, `dental-app/public/downloads/`), keeping the repository lightweight.
 
 ### ✅ G. Live Server Synchronization Center & Queue Inspector Modal
-- **Comprehensive Entity Sync Handlers**: Full MySQL `INSERT ... ON DUPLICATE KEY UPDATE` handlers in `backend/api/sync.php` across all 7 entities: `patients`, `appointments`, `doctors`, `services`, `vitals`, `attachments`, and `settings`.
+- **Comprehensive Entity Sync Handlers**: Full MySQL `INSERT ... ON DUPLICATE KEY UPDATE` handlers in `backend/api/sync.php` across all entities: `branches`, `patients`, `appointments`, `doctors`, `services`, `vitals`, `attachments`, and `settings`.
 - **Preflight & CORS Headers**: Universal `OPTIONS` preflight and `Access-Control-Allow-Origin: *` headers for flawless localhost development and remote cloud synchronization.
 - **Sync Center Modal (`SyncCenterModal.jsx`)**:
   - Accessible directly by clicking the **"Online / Offline [Count]"** badge in the upper header.
@@ -69,6 +69,25 @@
   - **Outbox Queue Inspector**: Table listing every queued change (Entity, Operation type, ID, Timestamp) with entity breakdown metrics.
   - **Action Suite**: Push to Cloud, Simulate Server Sync (clears outbox count for local dev), Export Queue Backup (JSON), and Clear Outbox.
   - **Resilient Offline Retention**: Local changes are permanently preserved in IndexedDB even if the cloud server is unreachable or offline.
+
+### ✅ H. Multi-Branch Architecture & Collision-Free Offline Numbering
+- **Universal Multi-Branch Management**:
+  - Pre-seeded with 4 core branches: **Manama** (`ARB-MNM`), **Riffa** (`ARB-RFA`), **Seef** (`ARB-SEF`), and **Muharraq** (`ARB-MUH`).
+  - Add and customize unlimited branches with custom color badges, address, phone number, and branch prefix in System Settings.
+- **Collision-Free Offline Patient Numbering**:
+  - Format: `ARB-[BRANCH]-[YEAR]-[SEQUENCE]` (e.g., `ARB-MNM-26-0001`, `ARB-RFA-26-0002`).
+  - Guarantees 100% collision-free customer registrations across multiple branches operating offline on separate local laptops/terminals.
+- **Global Patient Access & Roaming**:
+  - Patient records are globally searchable across all clinic branches by CPR, Mobile, Arabic/English name, or File ID.
+  - Any branch can look up a patient registered at another branch and schedule an appointment locally.
+  - Patient Directory includes a 1-click **Branch Filter** (`🌐 All Branches` or filter by specific branch) with Home Branch badges on all patient cards.
+- **Branch-Isolated Calendar & Doctor Management**:
+  - 1-click **Top Navigation Branch Switcher** dynamically filters doctors, dental chairs, and calendar schedules for the active terminal branch.
+  - Bookings and appointments are automatically tagged with the active `branch_id`.
+  - Doctor Directory and Edit Modal support primary branch assignment with branch indicators.
+- **Backend & Sync Integration**:
+  - MySQL `branches` table, `home_branch_id` / `created_at_branch_id` on `patients`, `branch_id` on `appointments`, and `primary_branch_id` on `doctors`.
+  - Bidirectional sync handlers in `sync.php` with foreign-key-check resilience during bulk syncs.
 
 ---
 

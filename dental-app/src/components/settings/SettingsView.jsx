@@ -93,6 +93,10 @@ export default function SettingsView() {
     syncNow, 
     isSyncing, 
     pendingSyncCount,
+    branches,
+    activeBranchId,
+    setActiveBranchId,
+    saveBranch,
     showToast 
   } = useApp();
 
@@ -100,6 +104,60 @@ export default function SettingsView() {
   const [clinicTagline, setClinicTagline] = useState(settings.clinic_tagline);
   const [clinicPhone, setClinicPhone] = useState(settings.clinic_phone || '');
   const [clinicAddress, setClinicAddress] = useState(settings.clinic_address || '');
+
+  // Multi-Branch Management State
+  const [editingBranch, setEditingBranch] = useState(null);
+  const [branchModalOpen, setBranchModalOpen] = useState(false);
+  const [branchFormName, setBranchFormName] = useState('');
+  const [branchFormCode, setBranchFormCode] = useState('');
+  const [branchFormPrefix, setBranchFormPrefix] = useState('');
+  const [branchFormAddress, setBranchFormAddress] = useState('');
+  const [branchFormPhone, setBranchFormPhone] = useState('');
+  const [branchFormColor, setBranchFormColor] = useState('#2563EB');
+
+  const handleOpenBranchModal = (br = null) => {
+    if (br) {
+      setEditingBranch(br);
+      setBranchFormName(br.name);
+      setBranchFormCode(br.code);
+      setBranchFormPrefix(br.prefix);
+      setBranchFormAddress(br.address || '');
+      setBranchFormPhone(br.phone || '');
+      setBranchFormColor(br.color || '#2563EB');
+    } else {
+      setEditingBranch(null);
+      setBranchFormName('');
+      setBranchFormCode('');
+      setBranchFormPrefix('');
+      setBranchFormAddress('');
+      setBranchFormPhone('');
+      setBranchFormColor('#10B981');
+    }
+    setBranchModalOpen(true);
+  };
+
+  const handleSaveBranch = async (e) => {
+    e.preventDefault();
+    if (!branchFormName || !branchFormCode || !branchFormPrefix) {
+      showToast('Please fill in Branch Name, Code, and Patient Prefix', 'error');
+      return;
+    }
+
+    const branchData = {
+      id: editingBranch ? editingBranch.id : `branch-${branchFormCode.toLowerCase().replace(/[^a-z0-9]/g, '')}`,
+      name: branchFormName,
+      code: branchFormCode.toUpperCase(),
+      prefix: branchFormPrefix.toUpperCase(),
+      address: branchFormAddress,
+      phone: branchFormPhone,
+      color: branchFormColor,
+      is_active: true,
+      updated_at: new Date().toISOString()
+    };
+
+    await saveBranch(branchData);
+    setBranchModalOpen(false);
+  };
 
   // Operating Hours & Break Schedule State
   const [clinicOpenTime, setClinicOpenTime] = useState(settings.clinic_open_time || '09:00');
@@ -247,6 +305,115 @@ export default function SettingsView() {
         >
           Save All Settings
         </button>
+      </div>
+
+      {/* 0. MULTI-BRANCH LOCATIONS & TERMINAL SETTINGS */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+              <Building className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">
+                Multi-Branch Clinic Locations & Offline Numbering
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Manage branch locations, unique offline numbering prefixes (e.g. ARB-MNM, ARB-RFA), and active terminal branch
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => handleOpenBranchModal()}
+            className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm self-end sm:self-auto cursor-pointer"
+          >
+            <span>+ Add Clinic Branch</span>
+          </button>
+        </div>
+
+        {/* Current Active Terminal Branch Selection */}
+        <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+              Current Terminal Active Branch:
+            </span>
+            <span className="text-[11px] text-slate-500 dark:text-slate-400">
+              New appointments, calendar bookings, and patient registrations will default to this branch.
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <select
+              value={activeBranchId}
+              onChange={(e) => setActiveBranchId(e.target.value)}
+              className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-xs font-bold py-2 px-3 rounded-xl border border-slate-300 dark:border-slate-600 cursor-pointer shadow-xs focus:ring-2 focus:ring-blue-500"
+            >
+              {branches.map(b => (
+                <option key={b.id} value={b.id}>
+                  📍 {b.name} ({b.prefix})
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Branch Cards Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {branches.map(b => {
+            const isTerminalActive = activeBranchId === b.id;
+            return (
+              <div
+                key={b.id}
+                className={`p-3.5 rounded-2xl border transition-all flex flex-col justify-between ${
+                  isTerminalActive
+                    ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/40 shadow-xs'
+                    : 'border-slate-200 dark:border-slate-700 bg-slate-50/30 dark:bg-slate-800/30'
+                }`}
+                style={{ borderTop: `4px solid ${b.color || '#3B82F6'}` }}
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-200">
+                      {b.prefix}
+                    </span>
+                    {isTerminalActive && (
+                      <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300">
+                        This Terminal
+                      </span>
+                    )}
+                  </div>
+                  <h4 className="font-extrabold text-xs text-slate-900 dark:text-white truncate">
+                    {b.name}
+                  </h4>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                    {b.address || 'No address specified'}
+                  </p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    📞 {b.phone || 'N/A'}
+                  </p>
+                </div>
+
+                <div className="mt-3 pt-2 border-t border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => setActiveBranchId(b.id)}
+                    className="text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                  >
+                    Set Active
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenBranchModal(b)}
+                    className="text-[10px] font-bold text-slate-600 dark:text-slate-300 hover:text-slate-900 bg-white dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer"
+                  >
+                    Edit
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* 1. CLINIC OPERATING HOURS & BREAK SCHEDULE */}
@@ -908,6 +1075,131 @@ export default function SettingsView() {
 
       </div>
     </form>
+
+    {/* BRANCH CREATE / EDIT MODAL */}
+    {branchModalOpen && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+        <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+            <div className="flex items-center gap-2">
+              <Building className="w-5 h-5 text-blue-600" />
+              <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
+                {editingBranch ? 'Edit Clinic Branch' : 'Add New Clinic Branch'}
+              </h3>
+            </div>
+            <button
+              type="button"
+              onClick={() => setBranchModalOpen(false)}
+              className="p-1.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+
+          <form onSubmit={handleSaveBranch} className="space-y-3 text-xs">
+            <div>
+              <label className="block font-bold uppercase text-slate-600 dark:text-slate-300 mb-1">
+                Branch Name *
+              </label>
+              <input
+                type="text"
+                required
+                value={branchFormName}
+                onChange={(e) => setBranchFormName(e.target.value)}
+                placeholder="e.g. Al Rabeesh Manama Branch"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border rounded-xl font-bold text-slate-900 dark:text-white"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block font-bold uppercase text-slate-600 dark:text-slate-300 mb-1">
+                  Branch Code *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={branchFormCode}
+                  onChange={(e) => setBranchFormCode(e.target.value)}
+                  placeholder="e.g. MNM, RFA, SEF"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border rounded-xl font-mono uppercase font-bold text-slate-900 dark:text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold uppercase text-slate-600 dark:text-slate-300 mb-1">
+                  Patient File Prefix *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={branchFormPrefix}
+                  onChange={(e) => setBranchFormPrefix(e.target.value)}
+                  placeholder="e.g. ARB-MNM, ARB-RFA"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border rounded-xl font-mono uppercase font-bold text-blue-600 dark:text-blue-400"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block font-bold uppercase text-slate-600 dark:text-slate-300 mb-1">
+                  Contact Phone
+                </label>
+                <input
+                  type="tel"
+                  value={branchFormPhone}
+                  onChange={(e) => setBranchFormPhone(e.target.value)}
+                  placeholder="e.g. +973 1722 3344"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border rounded-xl text-slate-900 dark:text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold uppercase text-slate-600 dark:text-slate-300 mb-1">
+                  Branch Color Tag
+                </label>
+                <input
+                  type="color"
+                  value={branchFormColor}
+                  onChange={(e) => setBranchFormColor(e.target.value)}
+                  className="w-full h-10 rounded-xl cursor-pointer p-1 bg-slate-50 dark:bg-slate-800 border"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block font-bold uppercase text-slate-600 dark:text-slate-300 mb-1">
+                Branch Address
+              </label>
+              <input
+                type="text"
+                value={branchFormAddress}
+                onChange={(e) => setBranchFormAddress(e.target.value)}
+                placeholder="e.g. Building 124, Road 3801, Manama Center"
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border rounded-xl text-slate-900 dark:text-white"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t">
+              <button
+                type="button"
+                onClick={() => setBranchModalOpen(false)}
+                className="px-4 py-2 font-bold text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2 font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-xs cursor-pointer"
+              >
+                Save Branch
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    )}
     </div>
   );
 }

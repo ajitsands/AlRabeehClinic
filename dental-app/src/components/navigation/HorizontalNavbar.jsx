@@ -17,7 +17,10 @@ import {
   ShieldCheck, 
   User, 
   ChevronDown,
-  PlusCircle
+  PlusCircle,
+  MapPin,
+  Building2,
+  Check
 } from 'lucide-react';
 
 import SyncCenterModal from '../common/SyncCenterModal';
@@ -30,6 +33,10 @@ export default function HorizontalNavbar({ onOpenNewPatient, onOpenNewAppointmen
     toggleTheme, 
     activeUserRole, 
     setActiveUserRole, 
+    branches,
+    activeBranchId,
+    activeBranch,
+    setActiveBranchId,
     settings, 
     cardReaderStatus, 
     isOnline, 
@@ -42,6 +49,7 @@ export default function HorizontalNavbar({ onOpenNewPatient, onOpenNewAppointmen
 
   const [isReadingCard, setIsReadingCard] = useState(false);
   const [showRoleMenu, setShowRoleMenu] = useState(false);
+  const [showBranchMenu, setShowBranchMenu] = useState(false);
   const [showSimMenu, setShowSimMenu] = useState(false);
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
 
@@ -73,7 +81,7 @@ export default function HorizontalNavbar({ onOpenNewPatient, onOpenNewAppointmen
       <div className="w-full px-3 sm:px-4">
         <div className="flex items-center justify-between h-16">
           
-          {/* Clinic Brand & Logo */}
+          {/* Clinic Brand, Logo & Branch Switcher */}
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-teal-400 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
               <Sparkles className="w-6 h-6" />
@@ -87,9 +95,88 @@ export default function HorizontalNavbar({ onOpenNewPatient, onOpenNewAppointmen
                   Dental Center
                 </span>
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">
+              <p className="text-xs text-slate-500 dark:text-slate-400 hidden lg:block">
                 {settings.clinic_tagline || 'Bahrain & GCC Smart Card Integrated System'}
               </p>
+            </div>
+
+            {/* Branch Switcher Badge & Dropdown */}
+            <div className="relative ml-1 sm:ml-2">
+              <button
+                type="button"
+                onClick={() => setShowBranchMenu(!showBranchMenu)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50/90 hover:bg-blue-100/90 dark:bg-slate-800 dark:hover:bg-slate-750 text-blue-800 dark:text-blue-200 border border-blue-200 dark:border-slate-700 text-xs font-bold transition-all cursor-pointer shadow-2xs group"
+                title="Change active clinic branch location"
+              >
+                <div 
+                  className="w-2.5 h-2.5 rounded-full shadow-xs shrink-0"
+                  style={{ backgroundColor: activeBranch?.color || '#2563EB' }}
+                />
+                <MapPin className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                <span className="font-black text-xs uppercase tracking-wide">{activeBranch?.code || 'MNM'}</span>
+                <span className="hidden md:inline font-semibold text-slate-600 dark:text-slate-300 max-w-[140px] truncate">
+                  • {activeBranch?.name?.replace('Al Rabeesh ', '') || 'Manama'}
+                </span>
+                <ChevronDown className="w-3 h-3 text-blue-500 group-hover:translate-y-0.5 transition-transform" />
+              </button>
+
+              {/* Branch Selection Dropdown */}
+              {showBranchMenu && (
+                <div className="absolute left-0 mt-2 w-72 rounded-2xl bg-white dark:bg-slate-800 shadow-2xl border border-slate-200 dark:border-slate-700 py-2 z-50 animate-in fade-in zoom-in-95 duration-150">
+                  <div className="px-3.5 py-1.5 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                      <Building2 className="w-3.5 h-3.5 text-blue-500" />
+                      Select Clinic Location
+                    </span>
+                    <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                      {branches.length} Branches
+                    </span>
+                  </div>
+
+                  <div className="p-1 space-y-1 max-h-64 overflow-y-auto">
+                    {branches.map((b) => {
+                      const isSelected = b.id === activeBranchId;
+                      return (
+                        <button
+                          key={b.id}
+                          type="button"
+                          onClick={() => {
+                            setActiveBranchId(b.id);
+                            setShowBranchMenu(false);
+                          }}
+                          className={`w-full text-left p-2.5 rounded-xl transition-all flex items-start justify-between gap-2 cursor-pointer ${
+                            isSelected
+                              ? 'bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800/80 text-blue-900 dark:text-blue-100'
+                              : 'hover:bg-slate-50 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200'
+                          }`}
+                        >
+                          <div className="flex items-start gap-2.5">
+                            <div 
+                              className="w-3 h-3 rounded-full mt-0.5 shrink-0 shadow-xs"
+                              style={{ backgroundColor: b.color || '#3B82F6' }}
+                            />
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-extrabold text-xs">{b.name}</span>
+                                <span className="px-1.5 py-0.2 text-[9px] font-black uppercase rounded bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200">
+                                  {b.code}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[190px] mt-0.5">
+                                {b.address}
+                              </p>
+                            </div>
+                          </div>
+
+                          {isSelected && (
+                            <Check className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

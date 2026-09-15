@@ -34,7 +34,7 @@ import {
 } from 'lucide-react';
 
 export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen, setIsModalOpen, preselectedSlot, setPreselectedSlot }) {
-  const { formatCurrency, formatDate, showToast, settings } = useApp();
+  const { formatCurrency, formatDate, showToast, settings, activeBranchId, activeBranch, branches } = useApp();
 
   const timeSlots = generateClinicTimeSlots(
     settings.clinic_open_time || '09:00',
@@ -85,26 +85,38 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
   const [bookingNotes, setBookingNotes] = useState('');
   const [patientSearchQuery, setPatientSearchQuery] = useState('');
 
-  // Load Data
+  // Load Data with Branch Filtering
   const loadData = async () => {
-    const docs = await db.doctors.filter(d => d.is_active).toArray();
-    const srvs = await db.services.filter(s => s.is_active).toArray();
-    const pts = await db.patients.toArray();
-    const apps = await db.appointments.where('appointment_date').equals(selectedDate).toArray();
+    const allDocs = await db.doctors.filter(d => d.is_active).toArray();
+    // Filter doctors practicing at current active branch
+    const docs = allDocs.filter(d => 
+      !d.primary_branch_id || 
+      d.primary_branch_id === activeBranchId || 
+      (d.branch_ids && d.branch_ids.includes(activeBranchId))
+    );
 
-    setDoctors(docs);
+    const srvs = await db.services.filter(s => s.is_active).toArray();
+    const pts = await db.patients.toArray(); // Global access to all patients
+    
+    // Filter appointments for current date and active branch
+    const allApps = await db.appointments.where('appointment_date').equals(selectedDate).toArray();
+    const apps = allApps.filter(a => !a.branch_id || a.branch_id === activeBranchId);
+
+    setDoctors(docs.length > 0 ? docs : allDocs); // Fallback to all docs if none mapped
     setServices(srvs);
     setPatients(pts);
     setAppointments(apps);
 
-    if (docs.length > 0 && !bookingDoctorId) {
-      setBookingDoctorId(docs[0].id);
+    if (docs.length > 0) {
+      if (!bookingDoctorId || !docs.some(d => d.id === bookingDoctorId)) {
+        setBookingDoctorId(docs[0].id);
+      }
     }
   };
 
   useEffect(() => {
     loadData();
-  }, [selectedDate]);
+  }, [selectedDate, activeBranchId]);
 
   // Handle Opening Booking Modal from a specific slot
   const handleSlotClick = (doctorId, timeSlot) => {
@@ -190,6 +202,7 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
       id: `app-${Date.now()}`,
       patient_id: bookingPatientId,
       doctor_id: bookingDoctorId,
+      branch_id: activeBranchId,
       service_id: bookingServiceId || null,
       appointment_date: selectedDate,
       start_time: bookingStartTime,
@@ -551,6 +564,18 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
           <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 hidden sm:inline">
             {formatDate(selectedDate)}
           </span>
+
+          {/* Active Branch Matrix Indicator */}
+          <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold border border-slate-200 dark:border-slate-700">
+            <div 
+              className="w-2.5 h-2.5 rounded-full"
+              style={{ backgroundColor: activeBranch?.color || '#3B82F6' }}
+            />
+            <span>{activeBranch?.name || 'Manama'} Matrix</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 font-black">
+              {doctors.length} Chairs
+            </span>
+          </div>
         </div>
 
         {/* Legend & Stats with Big Bold Count Numbers */}
