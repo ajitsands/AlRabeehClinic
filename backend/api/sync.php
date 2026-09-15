@@ -102,6 +102,22 @@ function ensureSchemaUpToDate($db) {
         if (empty($docCols)) {
             $db->exec("ALTER TABLE `doctors` ADD COLUMN `primary_branch_id` VARCHAR(50) NOT NULL DEFAULT 'branch-mnm' AFTER `qualification`;");
         }
+
+        // 7. Ensure `chair_number`, `room_number`, and other doctor columns are wide enough for descriptive titles
+        try {
+            $db->exec("ALTER TABLE `doctors` MODIFY COLUMN `chair_number` VARCHAR(150) NOT NULL;");
+            $db->exec("ALTER TABLE `doctors` MODIFY COLUMN `room_number` VARCHAR(100) NOT NULL;");
+            $db->exec("ALTER TABLE `doctors` MODIFY COLUMN `qualification` VARCHAR(255) NOT NULL;");
+            $db->exec("ALTER TABLE `doctors` MODIFY COLUMN `specialty` VARCHAR(255) NOT NULL;");
+            $db->exec("ALTER TABLE `doctors` MODIFY COLUMN `phone` VARCHAR(50) NULL;");
+        } catch (Exception $e) {}
+
+        // 8. Ensure patient file_number, cpr_number, phone columns are wide enough
+        try {
+            $db->exec("ALTER TABLE `patients` MODIFY COLUMN `file_number` VARCHAR(50) NOT NULL;");
+            $db->exec("ALTER TABLE `patients` MODIFY COLUMN `cpr_number` VARCHAR(50) NULL;");
+            $db->exec("ALTER TABLE `patients` MODIFY COLUMN `phone` VARCHAR(50) NOT NULL;");
+        } catch (Exception $e) {}
     } catch (Exception $e) {
         // Silently continue if permissions or already modified
     }
