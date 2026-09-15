@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../../db/indexedDB';
 import { useApp } from '../../context/AppContext';
 import { syncEngine } from '../../services/syncEngine';
@@ -26,7 +26,11 @@ import {
   CheckCircle, 
   X, 
   FileCheck,
-  AlertCircle
+  AlertCircle,
+  Mic,
+  MicOff,
+  Sparkles,
+  RotateCcw
 } from 'lucide-react';
 
 export default function VitalsAndAttachmentsManager({ activePatientId, onBackToList }) {
@@ -51,6 +55,113 @@ export default function VitalsAndAttachmentsManager({ activePatientId, onBackToL
   const [weightKg, setWeightKg] = useState(70.0);
   const [painScale, setPainScale] = useState(2);
   const [clinicalNotes, setClinicalNotes] = useState('');
+
+  // Speech Recognition (Voice to Text) State
+  const [isListening, setIsListening] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(true);
+  const recognitionRef = useRef(null);
+  const baseTextRef = useRef('');
+
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setSpeechSupported(false);
+    }
+  }, []);
+
+  // Stop Dictation Helper
+  const stopDictation = () => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (err) {
+        console.warn('Error stopping speech recognition:', err);
+      }
+      recognitionRef.current = null;
+    }
+    setIsListening(false);
+  };
+
+  // Start Dictation Helper
+  const startDictation = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      showToast('Speech recognition is not supported in this browser. Please use Chrome or Edge.', 'error');
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      // Capture starting text so new speech appends seamlessly
+      baseTextRef.current = clinicalNotes;
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        showToast('Microphone active: Start speaking to dictate notes...', 'info');
+      };
+
+      recognition.onresult = (event) => {
+        let transcriptAccum = '';
+        for (let i = 0; i < event.results.length; i++) {
+          transcriptAccum += event.results[i][0].transcript;
+        }
+
+        const prefix = baseTextRef.current ? baseTextRef.current.trim() + ' ' : '';
+        setClinicalNotes(prefix + transcriptAccum.trim());
+      };
+
+      recognition.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+          showToast('Microphone permission denied. Please allow microphone in browser.', 'error');
+        } else if (event.error !== 'no-speech') {
+          showToast(`Speech recognition notice: ${event.error}`, 'info');
+        }
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (err) {
+      console.error('Failed to start speech recognition', err);
+      setIsListening(false);
+      showToast('Could not start speech recognition', 'error');
+    }
+  };
+
+  const toggleVoiceDictation = () => {
+    if (isListening) {
+      stopDictation();
+    } else {
+      startDictation();
+    }
+  };
+
+  // Stop listening when modal closes
+  useEffect(() => {
+    if (!isVitalsModalOpen && isListening) {
+      stopDictation();
+    }
+  }, [isVitalsModalOpen]);
+
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (_) {}
+      }
+    };
+  }, []);
 
   // Attachment Form State
   const [isAttachmentModalOpen, setIsAttachmentModalOpen] = useState(false);
@@ -532,19 +643,29 @@ export default function VitalsAndAttachmentsManager({ activePatientId, onBackToL
 
       {/* MODAL: LOG VITALS */}
       {isVitalsModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-3xl w-full p-6 sm:p-7 shadow-2xl border border-slate-200 dark:border-slate-800 max-h-[92vh] overflow-y-auto my-auto animate-fadeIn">
             
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-2.5">
-                <Activity className="w-5 h-5 text-blue-600" />
-                <h3 className="font-bold text-base text-slate-900 dark:text-white">
-                  Record Patient Vitals
-                </h3>
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-blue-50 dark:bg-blue-950/60 rounded-2xl text-blue-600 dark:text-blue-400">
+                  <Activity className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-lg text-slate-900 dark:text-white">
+                    Record Patient Vitals & Clinical Examination
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Patient: <span className="font-semibold text-slate-700 dark:text-slate-300">{patient ? `${patient.first_name} ${patient.last_name}` : 'Selected Patient'}</span>
+                  </p>
+                </div>
               </div>
               <button
-                onClick={() => setIsVitalsModalOpen(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-600"
+                onClick={() => {
+                  stopDictation();
+                  setIsVitalsModalOpen(false);
+                }}
+                className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -552,48 +673,69 @@ export default function VitalsAndAttachmentsManager({ activePatientId, onBackToL
 
             <form onSubmit={handleSaveVitals} className="space-y-4 mt-4 text-xs">
               
-              {/* BP & Pulse */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">
-                  <label className="block font-bold uppercase text-slate-600 dark:text-slate-300 mb-1">
-                    Blood Pressure (Systolic / Diastolic)
-                  </label>
+              {/* Primary Vitals Grid (3 columns on desktop) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                {/* Blood Pressure */}
+                <div className="p-3.5 bg-slate-50 dark:bg-slate-800/70 border border-slate-200/70 dark:border-slate-700/60 rounded-2xl">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="font-bold uppercase tracking-wider text-[11px] text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+                      <Gauge className="w-3.5 h-3.5 text-blue-500" />
+                      Blood Pressure (mmHg)
+                    </label>
+                  </div>
                   <div className="flex items-center gap-2">
                     <input
                       type="number"
                       value={bpSystolic}
                       onChange={(e) => setBpSystolic(e.target.value)}
-                      placeholder="120"
-                      className="w-full px-2 py-1.5 bg-white dark:bg-slate-700 rounded-lg font-bold text-center border"
+                      placeholder="Systolic (120)"
+                      className="w-full px-2.5 py-2 bg-white dark:bg-slate-700 rounded-xl font-bold text-center border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white text-xs focus:ring-2 focus:ring-blue-500 outline-none"
                     />
-                    <span className="font-bold text-slate-400">/</span>
+                    <span className="font-bold text-slate-400 text-sm">/</span>
                     <input
                       type="number"
                       value={bpDiastolic}
                       onChange={(e) => setBpDiastolic(e.target.value)}
-                      placeholder="80"
-                      className="w-full px-2 py-1.5 bg-white dark:bg-slate-700 rounded-lg font-bold text-center border"
+                      placeholder="Diastolic (80)"
+                      className="w-full px-2.5 py-2 bg-white dark:bg-slate-700 rounded-xl font-bold text-center border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white text-xs focus:ring-2 focus:ring-blue-500 outline-none"
                     />
                   </div>
                 </div>
 
-                <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">
-                  <label className="block font-bold uppercase text-slate-600 dark:text-slate-300 mb-1">
-                    Pulse (BPM)
+                {/* Pulse */}
+                <div className="p-3.5 bg-slate-50 dark:bg-slate-800/70 border border-slate-200/70 dark:border-slate-700/60 rounded-2xl">
+                  <label className="font-bold uppercase tracking-wider text-[11px] text-slate-600 dark:text-slate-300 flex items-center gap-1.5 mb-1.5">
+                    <Heart className="w-3.5 h-3.5 text-rose-500" />
+                    Pulse Rate (BPM)
                   </label>
                   <input
                     type="number"
                     value={pulseBpm}
                     onChange={(e) => setPulseBpm(e.target.value)}
-                    className="w-full px-2 py-1.5 bg-white dark:bg-slate-700 rounded-lg font-bold text-center border"
+                    placeholder="72"
+                    className="w-full px-2.5 py-2 bg-white dark:bg-slate-700 rounded-xl font-bold text-center border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white text-xs focus:ring-2 focus:ring-blue-500 outline-none"
                   />
                 </div>
-              </div>
 
-              {/* Temperature & SpO2 */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">
-                  <label className="block font-bold uppercase text-slate-600 dark:text-slate-300 mb-1">
+                {/* SpO2 */}
+                <div className="p-3.5 bg-slate-50 dark:bg-slate-800/70 border border-slate-200/70 dark:border-slate-700/60 rounded-2xl">
+                  <label className="font-bold uppercase tracking-wider text-[11px] text-slate-600 dark:text-slate-300 flex items-center gap-1.5 mb-1.5">
+                    <Droplet className="w-3.5 h-3.5 text-cyan-500" />
+                    SpO2 Saturation (%)
+                  </label>
+                  <input
+                    type="number"
+                    value={spo2Percent}
+                    onChange={(e) => setSpo2Percent(e.target.value)}
+                    placeholder="99"
+                    className="w-full px-2.5 py-2 bg-white dark:bg-slate-700 rounded-xl font-bold text-center border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white text-xs focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+
+                {/* Temperature */}
+                <div className="p-3.5 bg-slate-50 dark:bg-slate-800/70 border border-slate-200/70 dark:border-slate-700/60 rounded-2xl">
+                  <label className="font-bold uppercase tracking-wider text-[11px] text-slate-600 dark:text-slate-300 flex items-center gap-1.5 mb-1.5">
+                    <Thermometer className="w-3.5 h-3.5 text-amber-500" />
                     Temperature (°C)
                   </label>
                   <input
@@ -601,27 +743,15 @@ export default function VitalsAndAttachmentsManager({ activePatientId, onBackToL
                     step="0.1"
                     value={temperatureC}
                     onChange={(e) => setTemperatureC(e.target.value)}
-                    className="w-full px-2 py-1.5 bg-white dark:bg-slate-700 rounded-lg font-bold text-center border"
+                    placeholder="36.8"
+                    className="w-full px-2.5 py-2 bg-white dark:bg-slate-700 rounded-xl font-bold text-center border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white text-xs focus:ring-2 focus:ring-blue-500 outline-none"
                   />
                 </div>
 
-                <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">
-                  <label className="block font-bold uppercase text-slate-600 dark:text-slate-300 mb-1">
-                    SpO2 Saturation (%)
-                  </label>
-                  <input
-                    type="number"
-                    value={spo2Percent}
-                    onChange={(e) => setSpo2Percent(e.target.value)}
-                    className="w-full px-2 py-1.5 bg-white dark:bg-slate-700 rounded-lg font-bold text-center border"
-                  />
-                </div>
-              </div>
-
-              {/* Blood Sugar & Weight */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">
-                  <label className="block font-bold uppercase text-slate-600 dark:text-slate-300 mb-1">
+                {/* Blood Sugar */}
+                <div className="p-3.5 bg-slate-50 dark:bg-slate-800/70 border border-slate-200/70 dark:border-slate-700/60 rounded-2xl">
+                  <label className="font-bold uppercase tracking-wider text-[11px] text-slate-600 dark:text-slate-300 flex items-center gap-1.5 mb-1.5">
+                    <Activity className="w-3.5 h-3.5 text-purple-500" />
                     Blood Sugar (mg/dL)
                   </label>
                   <input
@@ -629,12 +759,14 @@ export default function VitalsAndAttachmentsManager({ activePatientId, onBackToL
                     value={bloodSugarMg}
                     onChange={(e) => setBloodSugarMg(e.target.value)}
                     placeholder="95"
-                    className="w-full px-2 py-1.5 bg-white dark:bg-slate-700 rounded-lg font-bold text-center border"
+                    className="w-full px-2.5 py-2 bg-white dark:bg-slate-700 rounded-xl font-bold text-center border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white text-xs focus:ring-2 focus:ring-blue-500 outline-none"
                   />
                 </div>
 
-                <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">
-                  <label className="block font-bold uppercase text-slate-600 dark:text-slate-300 mb-1">
+                {/* Weight */}
+                <div className="p-3.5 bg-slate-50 dark:bg-slate-800/70 border border-slate-200/70 dark:border-slate-700/60 rounded-2xl">
+                  <label className="font-bold uppercase tracking-wider text-[11px] text-slate-600 dark:text-slate-300 flex items-center gap-1.5 mb-1.5">
+                    <Scale className="w-3.5 h-3.5 text-emerald-500" />
                     Weight (kg)
                   </label>
                   <input
@@ -642,18 +774,27 @@ export default function VitalsAndAttachmentsManager({ activePatientId, onBackToL
                     step="0.5"
                     value={weightKg}
                     onChange={(e) => setWeightKg(e.target.value)}
-                    className="w-full px-2 py-1.5 bg-white dark:bg-slate-700 rounded-lg font-bold text-center border"
+                    placeholder="70.0"
+                    className="w-full px-2.5 py-2 bg-white dark:bg-slate-700 rounded-xl font-bold text-center border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white text-xs focus:ring-2 focus:ring-blue-500 outline-none"
                   />
                 </div>
               </div>
 
               {/* Pain Scale Slider (0-10) */}
-              <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">
-                <div className="flex items-center justify-between mb-1">
-                  <label className="font-bold uppercase text-slate-600 dark:text-slate-300">
-                    Dental Pain Index: <span className="font-black text-blue-600">{painScale} / 10</span>
+              <div className="p-4 bg-slate-50 dark:bg-slate-800/70 border border-slate-200/70 dark:border-slate-700/60 rounded-2xl">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="font-bold uppercase tracking-wider text-[11px] text-slate-600 dark:text-slate-300 flex items-center gap-2">
+                    <span>Dental Pain Index:</span>
+                    <span className="font-black text-sm px-2.5 py-0.5 rounded-lg bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-300">
+                      {painScale} / 10
+                    </span>
                   </label>
-                  {getPainFace(painScale)}
+                  <div className="flex items-center gap-1.5 bg-white dark:bg-slate-700 px-3 py-1 rounded-xl shadow-xs border border-slate-200/60 dark:border-slate-600">
+                    {getPainFace(painScale)}
+                    <span className="font-bold text-xs text-slate-700 dark:text-slate-200">
+                      {painScale === 0 ? 'No Pain' : painScale <= 3 ? 'Mild' : painScale <= 6 ? 'Moderate' : painScale <= 8 ? 'Severe' : 'Worst Possible'}
+                    </span>
+                  </div>
                 </div>
                 <input
                   type="range"
@@ -661,41 +802,115 @@ export default function VitalsAndAttachmentsManager({ activePatientId, onBackToL
                   max="10"
                   value={painScale}
                   onChange={(e) => setPainScale(e.target.value)}
-                  className="w-full accent-blue-600 cursor-pointer"
+                  className="w-full accent-blue-600 h-2 bg-slate-200 dark:bg-slate-700 rounded-lg cursor-pointer"
                 />
-                <div className="flex justify-between text-[10px] text-slate-400 mt-1">
-                  <span>0 - No Pain</span>
-                  <span>5 - Moderate</span>
-                  <span>10 - Severe Throbbing</span>
+                <div className="flex justify-between text-[10px] font-semibold text-slate-400 mt-1.5 px-0.5">
+                  <span className="text-emerald-600 dark:text-emerald-400">0 - Comfortable</span>
+                  <span className="text-amber-600 dark:text-amber-400">5 - Moderate Ache</span>
+                  <span className="text-rose-600 dark:text-rose-400">10 - Severe Throbbing</span>
                 </div>
               </div>
 
-              {/* Clinical Notes */}
-              <div>
-                <label className="block font-bold uppercase text-slate-600 dark:text-slate-300 mb-1">
-                  Clinical & Dental Charting Notes
-                </label>
+              {/* Clinical Notes with Speech Recognition (Microphone) */}
+              <div className="p-4 bg-slate-50 dark:bg-slate-800/70 border border-slate-200/70 dark:border-slate-700/60 rounded-2xl space-y-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label className="font-bold uppercase tracking-wider text-[11px] text-slate-700 dark:text-slate-200 flex items-center gap-2">
+                    <FileText className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Clinical & Dental Charting Notes</span>
+                  </label>
+
+                  {/* Dictation / Microphone Controls */}
+                  <div className="flex items-center gap-2">
+                    {clinicalNotes && (
+                      <button
+                        type="button"
+                        onClick={() => setClinicalNotes('')}
+                        className="text-[11px] text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 font-medium px-2 py-1 rounded-lg hover:bg-slate-200/60 dark:hover:bg-slate-700 transition"
+                      >
+                        Clear Notes
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={toggleVoiceDictation}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer ${
+                        isListening
+                          ? 'bg-rose-600 hover:bg-rose-700 text-white ring-4 ring-rose-200 dark:ring-rose-950 animate-pulse shadow-rose-500/30'
+                          : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/20 active:scale-95'
+                      }`}
+                      title={isListening ? 'Click to stop voice recording' : 'Click to speak: Voice will type automatically into the box'}
+                    >
+                      {isListening ? (
+                        <>
+                          <span className="relative flex h-2.5 w-2.5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white"></span>
+                          </span>
+                          <Mic className="w-4 h-4 text-white animate-bounce" />
+                          <span>Doctor Speaking (Click to Stop)</span>
+                        </>
+                      ) : (
+                        <>
+                          <Mic className="w-4 h-4" />
+                          <span>Voice Dictation (Speak to Write)</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Real-time Listening Animation Banner */}
+                {isListening && (
+                  <div className="p-2.5 bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900 rounded-xl flex items-center justify-between gap-3 text-xs text-rose-700 dark:text-rose-300 animate-fadeIn">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="flex items-end gap-0.5 h-4 px-1">
+                        <span className="w-1 bg-rose-600 dark:bg-rose-400 h-3 rounded-full animate-bounce [animation-delay:0ms]"></span>
+                        <span className="w-1 bg-rose-600 dark:bg-rose-400 h-4 rounded-full animate-bounce [animation-delay:150ms]"></span>
+                        <span className="w-1 bg-rose-600 dark:bg-rose-400 h-2 rounded-full animate-bounce [animation-delay:300ms]"></span>
+                        <span className="w-1 bg-rose-600 dark:bg-rose-400 h-4 rounded-full animate-bounce [animation-delay:450ms]"></span>
+                      </div>
+                      <p className="truncate font-medium">
+                        <span className="font-black uppercase">Listening...</span> Speak symptoms, quadrant notes, or findings clearly. Words will type automatically.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={stopDictation}
+                      className="px-2 py-0.5 bg-rose-200/60 dark:bg-rose-900/60 hover:bg-rose-200 text-rose-800 dark:text-rose-200 font-bold rounded-lg text-[11px] shrink-0"
+                    >
+                      Done
+                    </button>
+                  </div>
+                )}
+
                 <textarea
-                  rows={3}
+                  rows={4}
                   value={clinicalNotes}
                   onChange={(e) => setClinicalNotes(e.target.value)}
-                  placeholder="Record symptoms, tooth quadrant notes, examination findings..."
-                  className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border rounded-xl text-slate-900 dark:text-white"
+                  placeholder="Record symptoms, tooth quadrant notes, examination findings (or click the microphone button above to speak directly)..."
+                  className={`w-full p-3.5 bg-white dark:bg-slate-700/90 border rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 text-xs leading-relaxed focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition resize-y min-h-[105px] ${
+                    isListening ? 'border-rose-400 dark:border-rose-600 ring-2 ring-rose-200 dark:ring-rose-900/40' : 'border-slate-200 dark:border-slate-600'
+                  }`}
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
                 <button
                   type="button"
-                  onClick={() => setIsVitalsModalOpen(false)}
-                  className="px-4 py-2 font-bold text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl"
+                  onClick={() => {
+                    stopDictation();
+                    setIsVitalsModalOpen(false);
+                  }}
+                  className="px-5 py-2.5 font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-xs"
+                  className="px-6 py-2.5 font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md hover:shadow-blue-500/20 transition cursor-pointer flex items-center gap-2"
                 >
+                  <CheckCircle className="w-4 h-4" />
                   Save Vitals
                 </button>
               </div>
