@@ -37,12 +37,16 @@
 - **Built-in Smart Card Simulator**: Fallback testing options with 3 Bahraini/GCC test identity presets.
 - **Settings Driver Center**: Direct one-click **"Download Now"** buttons for `eRevealerSetup 5.4.0.4.exe` (50.6MB) and `SCardReadServer.exe` (6.1MB), with copy-path utilities and live connection diagnostics.
 
-### ✅ D. Patient Directory & Select2 Searchable Dropdown
+### ✅ D. Patient & Doctor Directories
 - **4 Cards per Row Grid Layout**: Enforced on Patient Registry, Doctors Directory, and Dental Services catalog (`grid-cols-1 sm:grid-cols-2 lg:grid-cols-4`).
 - **Prominent Patient File Number Badges**: Extra-bold `PAT-2026-XXXX` badges across patient cards and directories.
 - **Select2-Style Searchable Patient Dropdown (`SearchablePatientSelect.jsx`)**:
   - Live typeahead search filtering across **English Name, Arabic Name, CPR Number, Mobile Phone, and File Number**.
   - Integrated into the **Vitals & Clinical X-Rays Header** and the **Appointment Booking Modal**.
+- **Doctor Profile Image Management (Dual Mode)**:
+  - **Local File Upload**: Drag-and-drop or select any image (PNG, JPG, WebP up to 5MB) converting to Base64 in local IndexedDB.
+  - **Web URL Link**: Direct image URL with quick presets (Male Dr, Female Dr, Dental Surgeon).
+  - **Live Preview & Color Accent**: Real-time avatar preview with doctor's designated chair color ring and status indicator.
 
 ### ✅ E. Vitals Tracker & High-Capacity File Attachments
 - **Full Clinical Vitals Log**: Blood Pressure, Resting Pulse, Temperature, Blood Sugar, SpO2, Weight, and Visual Analog Dental Pain Scale (0-10) with facial indicators.
