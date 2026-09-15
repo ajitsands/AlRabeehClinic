@@ -154,16 +154,31 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
   const handleScanCardInModal = async (isSim = false, preset = 0, cardType = 'standard') => {
     setIsReadingCard(true);
     try {
-      if (cardType === 'new_bahrain') {
-        showToast('Reading New Bahrain Card (Chip on Back)...', 'info', 3000);
+      if (isSim) {
+        // User explicitly clicked the Simulator button
+        const simCard = await triggerSmartCardRead(true, preset);
+        populateFormWithCardData(simCard);
+        showToast('Simulated CPR Card data loaded.', 'info');
+        return;
       }
-      const card = await triggerSmartCardRead(isSim, preset, cardType);
+
+      if (cardType === 'new_bahrain') {
+        showToast('Reading New Issue Bahrain Smart Card (Chip on Back)...', 'info', 3000);
+      } else {
+        showToast('Reading Smart Card from connected reader...', 'info', 3000);
+      }
+
+      const card = await triggerSmartCardRead(false, 0, cardType);
+      if (!card || (!card.cpr_number && !card.full_name_en)) {
+        throw new Error('No data detected on inserted card. Please check card insertion and orientation.');
+      }
+
       populateFormWithCardData(card);
       showToast('Smart Card data extracted successfully!', 'success');
     } catch (err) {
-      showToast(err.message || 'No card detected in reader. Running simulator fallback...', 'warning');
-      const simCard = await triggerSmartCardRead(true, 0);
-      populateFormWithCardData(simCard);
+      console.error('Smart card reader error:', err);
+      // STOP and show Card Reading Error message - DO NOT fall back to simulator
+      showToast(err.message || 'Card Reading Error: Unable to read smart card. Please ensure card is inserted properly.', 'error', 7000);
     } finally {
       setIsReadingCard(false);
     }

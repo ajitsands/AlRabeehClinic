@@ -75,13 +75,17 @@ export default function HorizontalNavbar({ onOpenNewPatient, onOpenNewAppointmen
     setIsReadingCard(true);
     try {
       if (cardType === 'new_bahrain') {
-        showToast('Scanning New Bahrain Smart Card (Chip on Back)...', 'info', 3500);
+        showToast('Scanning New Issue Bahrain Smart Card (Chip on Back)...', 'info', 3500);
       }
-      await triggerSmartCardRead(isSim, preset, cardType);
+      const card = await triggerSmartCardRead(isSim, preset, cardType);
+      if (!card || (!card.cpr_number && !card.full_name_en)) {
+        throw new Error('No data detected on inserted card. Please check card insertion and orientation.');
+      }
       onOpenNewPatient(); // Open registration modal with scanned card filled
     } catch (err) {
-      showToast(err.message || 'Smart Card reader notice. Please check card insertion.', 'warning', 6000);
-      setShowSimMenu(true);
+      console.error('Smart card reader quick scan error:', err);
+      // STOP and show card reading error message - DO NOT fallback to simulator
+      showToast(err.message || 'Card Reading Error: Unable to read smart card. Please ensure card is inserted properly.', 'error', 7000);
     } finally {
       setIsReadingCard(false);
     }

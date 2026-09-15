@@ -309,9 +309,14 @@ class SmartCardReaderService {
     const misc = json.MiscellaneousTextData || {};
     const hasData = json.CPR || json.IdNumber || json.EnglishFirstName || json.EnglishFullName || misc.CPRNO || misc.FirstNameEnglish;
 
-    // If server returned an error description with empty cardholder fields
+    // If server returned an error description or no data was extracted
     if (json.ErrorDescription && !hasData) {
       throw new Error(json.ErrorDescription);
+    }
+
+    if (!hasData) {
+      const errMsg = json.ErrorDescription || json.ErrorMessage || 'Card reading error: No data returned from card. Please check card chip and orientation in reader.';
+      throw new Error(errMsg);
     }
 
     return this.parseCardPayload(json);
