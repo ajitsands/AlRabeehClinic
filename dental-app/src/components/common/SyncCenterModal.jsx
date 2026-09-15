@@ -19,7 +19,9 @@ import {
   Sparkles,
   Check,
   AlertTriangle,
-  FileText
+  FileText,
+  HelpCircle,
+  ShieldCheck
 } from 'lucide-react';
 
 export default function SyncCenterModal({ isOpen, onClose }) {
@@ -45,6 +47,9 @@ export default function SyncCenterModal({ isOpen, onClose }) {
   const [isSyncingLocal, setIsSyncingLocal] = useState(false);
   const [syncStatusMsg, setSyncStatusMsg] = useState(null);
 
+  // Beautiful Custom Confirmation Modal State
+  const [confirmDialog, setConfirmDialog] = useState(null); // { type: 'CLEAR' | 'SIMULATE', title, message, warning }
+
   // Load pending items when modal opens
   useEffect(() => {
     if (isOpen) {
@@ -52,6 +57,7 @@ export default function SyncCenterModal({ isOpen, onClose }) {
       setTargetUrl(syncEngine.getApiUrl());
       setTestResult(null);
       setSyncStatusMsg(null);
+      setConfirmDialog(null);
     }
   }, [isOpen, pendingSyncCount]);
 
@@ -94,7 +100,10 @@ export default function SyncCenterModal({ isOpen, onClose }) {
     try {
       const result = await syncNow();
       if (result?.success) {
-        setSyncStatusMsg({ type: 'success', text: result.message || `Successfully synced ${result.count || 0} records.` });
+        setSyncStatusMsg({ 
+          type: 'success', 
+          text: result.message || `Successfully synced ${result.count || 0} records.` 
+        });
         await loadPendingList();
       } else {
         setSyncStatusMsg({ 
@@ -110,33 +119,56 @@ export default function SyncCenterModal({ isOpen, onClose }) {
     }
   };
 
-  const handleSimulateSync = async () => {
-    if (!window.confirm('Simulate server sync? This will mark all pending outbox records as synchronized and clear the queue.')) {
-      return;
-    }
-    setIsSyncingLocal(true);
-    try {
-      const result = await syncNow({ forceMock: true });
-      showToast(result?.message || 'Simulated sync completed.', 'success');
-      setSyncStatusMsg({ type: 'success', text: 'Simulated sync successfully processed and queue cleared.' });
-      await loadPendingList();
-    } finally {
-      setIsSyncingLocal(false);
-    }
+  // Open modern confirm dialog for Simulate Sync
+  const promptSimulateSync = () => {
+    setConfirmDialog({
+      type: 'SIMULATE',
+      title: 'Simulate Server Sync & Clear Badge',
+      message: `Are you sure you want to simulate synchronization for all ${pendingSyncCount} pending records?`,
+      details: 'This will mark all outbox items as processed and reset your pending count to 0. All patient data, appointments, and doctors remain 100% intact in your local database.',
+      confirmText: 'Yes, Simulate & Reset Count',
+      confirmColor: 'purple'
+    });
   };
 
-  const handleClearOutbox = async () => {
-    if (!window.confirm(`Are you sure you want to clear all ${pendingSyncCount} pending items from the outbox? Changes remain in your local database but won't be pushed to the server.`)) {
-      return;
-    }
-    setIsClearing(true);
-    try {
-      await clearOutbox();
-      await loadPendingList();
-      showToast('Outbox queue cleared', 'info');
-      setSyncStatusMsg({ type: 'info', text: 'Outbox queue has been cleared.' });
-    } finally {
-      setIsClearing(false);
+  // Open modern confirm dialog for Clear Outbox
+  const promptClearOutbox = () => {
+    setConfirmDialog({
+      type: 'CLEAR',
+      title: 'Clear Outbox Sync Queue',
+      message: `Are you sure you want to clear all ${pendingSyncCount} pending items from the outbox?`,
+      details: 'All changes remain safely stored in your local clinic database. They will simply be dismissed from the cloud synchronization queue.',
+      confirmText: 'Yes, Clear Outbox Queue',
+      confirmColor: 'rose'
+    });
+  };
+
+  // Execute Confirmed Action
+  const handleExecuteConfirmedAction = async () => {
+    if (!confirmDialog) return;
+    const actionType = confirmDialog.type;
+    setConfirmDialog(null);
+
+    if (actionType === 'SIMULATE') {
+      setIsSyncingLocal(true);
+      try {
+        const result = await syncNow({ forceMock: true });
+        showToast(result?.message || 'Simulated sync completed.', 'success');
+        setSyncStatusMsg({ type: 'success', text: 'Simulated sync successfully processed. Outbox count reset to 0.' });
+        await loadPendingList();
+      } finally {
+        setIsSyncingLocal(false);
+      }
+    } else if (actionType === 'CLEAR') {
+      setIsClearing(true);
+      try {
+        await clearOutbox();
+        await loadPendingList();
+        showToast('Outbox queue cleared successfully', 'info');
+        setSyncStatusMsg({ type: 'info', text: 'Outbox queue has been cleared.' });
+      } finally {
+        setIsClearing(false);
+      }
     }
   };
 
@@ -163,7 +195,7 @@ export default function SyncCenterModal({ isOpen, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden relative">
         
         {/* Modal Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-850/80">
@@ -193,7 +225,7 @@ export default function SyncCenterModal({ isOpen, onClose }) {
 
           <button
             onClick={onClose}
-            className="p-2 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="p-2 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -214,7 +246,7 @@ export default function SyncCenterModal({ isOpen, onClose }) {
             </div>
             <button 
               onClick={() => setSyncStatusMsg(null)}
-              className="text-xs font-bold hover:underline ml-3"
+              className="text-xs font-bold hover:underline ml-3 cursor-pointer"
             >
               Dismiss
             </button>
@@ -225,7 +257,7 @@ export default function SyncCenterModal({ isOpen, onClose }) {
         <div className="flex items-center gap-2 px-6 pt-3 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-bold">
           <button
             onClick={() => setActiveTab('queue')}
-            className={`pb-2.5 px-3 border-b-2 flex items-center gap-1.5 transition-colors ${
+            className={`pb-2.5 px-3 border-b-2 flex items-center gap-1.5 transition-colors cursor-pointer ${
               activeTab === 'queue'
                 ? 'border-blue-600 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
@@ -240,7 +272,7 @@ export default function SyncCenterModal({ isOpen, onClose }) {
 
           <button
             onClick={() => setActiveTab('server')}
-            className={`pb-2.5 px-3 border-b-2 flex items-center gap-1.5 transition-colors ${
+            className={`pb-2.5 px-3 border-b-2 flex items-center gap-1.5 transition-colors cursor-pointer ${
               activeTab === 'server'
                 ? 'border-blue-600 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
@@ -252,7 +284,7 @@ export default function SyncCenterModal({ isOpen, onClose }) {
 
           <button
             onClick={() => setActiveTab('instructions')}
-            className={`pb-2.5 px-3 border-b-2 flex items-center gap-1.5 transition-colors ${
+            className={`pb-2.5 px-3 border-b-2 flex items-center gap-1.5 transition-colors cursor-pointer ${
               activeTab === 'instructions'
                 ? 'border-blue-600 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
@@ -329,7 +361,7 @@ export default function SyncCenterModal({ isOpen, onClose }) {
                   <button
                     onClick={handleTriggerSync}
                     disabled={isSyncing || isSyncingLocal}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-bold shadow-sm transition-all"
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-bold shadow-sm transition-all cursor-pointer"
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${isSyncing || isSyncingLocal ? 'animate-spin' : ''}`} />
                     <span>{isSyncing || isSyncingLocal ? 'Syncing with Cloud...' : 'Push to Cloud Server'}</span>
@@ -337,9 +369,9 @@ export default function SyncCenterModal({ isOpen, onClose }) {
 
                   {/* Simulate Sync (Fallback if remote server offline) */}
                   <button
-                    onClick={handleSimulateSync}
+                    onClick={promptSimulateSync}
                     disabled={isSyncing || isSyncingLocal || pendingSyncCount === 0}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-purple-100 dark:bg-purple-950/60 hover:bg-purple-200 dark:hover:bg-purple-900 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-800 text-xs font-semibold transition-all disabled:opacity-50"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-purple-100 dark:bg-purple-950/60 hover:bg-purple-200 dark:hover:bg-purple-900 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-800 text-xs font-semibold transition-all disabled:opacity-50 cursor-pointer"
                     title="Marks current queue as synced and clears outbox count"
                   >
                     <Sparkles className="w-3.5 h-3.5 text-purple-500" />
@@ -352,7 +384,7 @@ export default function SyncCenterModal({ isOpen, onClose }) {
                   <button
                     onClick={handleExportBackup}
                     disabled={pendingItems.length === 0}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 text-xs font-semibold transition-all disabled:opacity-50"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 text-xs font-semibold transition-all disabled:opacity-50 cursor-pointer"
                     title="Export pending records to JSON file"
                   >
                     <Download className="w-3.5 h-3.5" />
@@ -361,9 +393,9 @@ export default function SyncCenterModal({ isOpen, onClose }) {
 
                   {/* Clear Outbox */}
                   <button
-                    onClick={handleClearOutbox}
+                    onClick={promptClearOutbox}
                     disabled={isClearing || pendingSyncCount === 0}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800 text-xs font-semibold transition-all disabled:opacity-50"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800 text-xs font-semibold transition-all disabled:opacity-50 cursor-pointer"
                     title="Delete pending items from outbox queue"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -446,14 +478,14 @@ export default function SyncCenterModal({ isOpen, onClose }) {
                   />
                   <button
                     onClick={handleSaveUrl}
-                    className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold transition-all"
+                    className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold transition-all cursor-pointer"
                   >
                     Save URL
                   </button>
                   <button
                     onClick={handleTestConnection}
                     disabled={isTesting}
-                    className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 transition-all"
+                    className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
                   >
                     <Play className={`w-3.5 h-3.5 ${isTesting ? 'animate-spin' : ''}`} />
                     <span>{isTesting ? 'Testing...' : 'Test Connection'}</span>
@@ -465,13 +497,13 @@ export default function SyncCenterModal({ isOpen, onClose }) {
                   <span className="text-slate-500 font-medium">Quick Presets:</span>
                   <button
                     onClick={() => { setTargetUrl('https://alrabeesh.sandslab.com/backend/api/sync.php'); }}
-                    className="px-2 py-1 rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-[11px] font-semibold hover:bg-slate-300"
+                    className="px-2 py-1 rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-[11px] font-semibold hover:bg-slate-300 cursor-pointer"
                   >
                     Production (sandslab.com)
                   </button>
                   <button
                     onClick={() => { setTargetUrl('http://localhost:8000/backend/api/sync.php'); }}
-                    className="px-2 py-1 rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-[11px] font-semibold hover:bg-slate-300"
+                    className="px-2 py-1 rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-[11px] font-semibold hover:bg-slate-300 cursor-pointer"
                   >
                     Local PHP Server (Port 8000)
                   </button>
@@ -533,7 +565,8 @@ export default function SyncCenterModal({ isOpen, onClose }) {
                   Deploying Backend to Production Server (cPanel / SSH):
                 </h4>
                 <div className="p-3 bg-slate-900 text-emerald-400 font-mono text-xs rounded-lg overflow-x-auto space-y-1">
-                  <p className="text-slate-400"># 1. Pull latest code to server</p>
+                  <p className="text-slate-400"># 1. Reset and pull latest code to server</p>
+                  <p>git reset --hard origin/main</p>
                   <p>git pull origin main</p>
                   <p className="text-slate-400 mt-2"># 2. Verify backend folder exists in public root</p>
                   <p>ls -la backend/api/sync.php</p>
@@ -553,11 +586,71 @@ export default function SyncCenterModal({ isOpen, onClose }) {
           </span>
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold transition-all"
+            className="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold transition-all cursor-pointer"
           >
             Close
           </button>
         </div>
+
+        {/* 🌟 PRETTY CUSTOM CONFIRMATION MODAL (Replaces browser alert/confirm) */}
+        {confirmDialog && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center p-6 bg-slate-950/70 backdrop-blur-xs animate-in fade-in zoom-in-95 duration-150">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-md p-6 text-center space-y-4">
+              
+              {/* Icon */}
+              <div className={`w-14 h-14 rounded-2xl mx-auto flex items-center justify-center shadow-lg ${
+                confirmDialog.type === 'CLEAR' 
+                  ? 'bg-gradient-to-tr from-rose-500 to-amber-500 text-white shadow-rose-500/25' 
+                  : 'bg-gradient-to-tr from-purple-600 to-indigo-500 text-white shadow-purple-500/25'
+              }`}>
+                {confirmDialog.type === 'CLEAR' ? (
+                  <Trash2 className="w-7 h-7" />
+                ) : (
+                  <Sparkles className="w-7 h-7" />
+                )}
+              </div>
+
+              {/* Title & Description */}
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                  {confirmDialog.title}
+                </h3>
+                <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 mt-2">
+                  {confirmDialog.message}
+                </p>
+                <div className="mt-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 text-[11px] text-slate-500 dark:text-slate-400 flex items-start gap-2 text-left">
+                  <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                  <span>{confirmDialog.details}</span>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setConfirmDialog(null)}
+                  className="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 font-bold text-xs transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleExecuteConfirmedAction}
+                  className={`w-full py-2.5 px-4 rounded-xl text-white font-bold text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    confirmDialog.type === 'CLEAR'
+                      ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-600/30'
+                      : 'bg-purple-600 hover:bg-purple-700 shadow-purple-600/30'
+                  }`}
+                >
+                  {confirmDialog.type === 'CLEAR' ? <Trash2 className="w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
+                  <span>{confirmDialog.confirmText}</span>
+                </button>
+              </div>
+
+            </div>
+          </div>
+        )}
 
       </div>
     </div>
