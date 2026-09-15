@@ -210,6 +210,9 @@ export default function VitalsAndAttachmentsManager({ activePatientId, onBackToL
   const [isExcelLoading, setIsExcelLoading] = useState(false);
   const docxContainerRef = useRef(null);
 
+  // Delete Attachment Confirmation Modal State
+  const [attachmentToDelete, setAttachmentToDelete] = useState(null);
+
   // Helper to categorize attachment file formats
   const getAttachmentType = (att) => {
     if (!att) return 'unknown';
@@ -547,15 +550,23 @@ export default function VitalsAndAttachmentsManager({ activePatientId, onBackToL
     loadData();
   };
 
-  // Delete Attachment
-  const handleDeleteAttachment = async (id, e) => {
-    e.stopPropagation();
-    if (confirm('Are you sure you want to delete this clinical attachment?')) {
-      await db.attachments.delete(id);
-      await syncEngine.queueChange('attachments', id, 'DELETE', { id });
-      showToast('Attachment deleted', 'info');
-      loadData();
+  // Delete Attachment Handler & Custom Confirmation
+  const handleDeleteClick = (att, e) => {
+    if (e) e.stopPropagation();
+    setAttachmentToDelete(att);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!attachmentToDelete) return;
+    const { id, file_name } = attachmentToDelete;
+    setAttachmentToDelete(null);
+    if (previewAttachment && previewAttachment.id === id) {
+      setPreviewAttachment(null);
     }
+    await db.attachments.delete(id);
+    await syncEngine.queueChange('attachments', id, 'DELETE', { id });
+    showToast(`Attachment "${file_name}" deleted`, 'info');
+    loadData();
   };
 
   const getPainFace = (score) => {
@@ -859,15 +870,15 @@ export default function VitalsAndAttachmentsManager({ activePatientId, onBackToL
                         e.stopPropagation();
                         setPreviewAttachment(att);
                       }}
-                      className="p-1 rounded-lg text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800"
-                      title="View Image"
+                      className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800 transition"
+                      title="View Attachment"
                     >
                       <Eye className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={(e) => handleDeleteAttachment(att.id, e)}
-                      className="p-1 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-slate-800"
-                      title="Delete"
+                      onClick={(e) => handleDeleteClick(att, e)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition"
+                      title="Delete Attachment"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -1290,6 +1301,61 @@ export default function VitalsAndAttachmentsManager({ activePatientId, onBackToL
               </div>
 
             </form>
+
+          </div>
+        </div>
+      )}
+
+      {/* CUSTOM CONFIRMATION MODAL: DELETE ATTACHMENT */}
+      {attachmentToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-md p-4 animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 text-center animate-scaleUp">
+            
+            {/* Warning Icon Badge */}
+            <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-rose-100 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-900/60 flex items-center justify-center text-rose-600 dark:text-rose-400 shadow-inner">
+              <Trash2 className="w-7 h-7 animate-bounce" />
+            </div>
+
+            <h3 className="font-bold text-lg text-slate-900 dark:text-white mb-1.5">
+              Delete Clinical Attachment?
+            </h3>
+
+            {/* Target File Preview Box */}
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-200/70 dark:border-slate-700 text-left my-4">
+              <p className="font-bold text-xs text-slate-900 dark:text-white truncate">
+                {attachmentToDelete.file_name}
+              </p>
+              <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                <span className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 font-bold text-[10px] text-slate-700 dark:text-slate-300">
+                  {attachmentToDelete.category}
+                </span>
+                <span>•</span>
+                <span>{(attachmentToDelete.file_size_bytes / (1024 * 1024)).toFixed(2)} MB</span>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
+              Are you sure you want to delete this clinical file from the patient's record? This action cannot be undone.
+            </p>
+
+            {/* Modal Actions */}
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setAttachmentToDelete(null)}
+                className="flex-1 py-2.5 px-4 rounded-xl font-bold text-xs text-slate-700 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                className="flex-1 py-2.5 px-4 rounded-xl font-bold text-xs text-white bg-rose-600 hover:bg-rose-700 shadow-lg shadow-rose-600/25 transition flex items-center justify-center gap-1.5"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Delete File</span>
+              </button>
+            </div>
 
           </div>
         </div>
