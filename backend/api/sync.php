@@ -132,6 +132,19 @@ function ensureSchemaUpToDate($db) {
             $db->exec("ALTER TABLE `patients` MODIFY COLUMN `cpr_number` VARCHAR(50) NULL;");
             $db->exec("ALTER TABLE `patients` MODIFY COLUMN `phone` VARCHAR(50) NOT NULL;");
         } catch (Exception $e) {}
+
+        // 9. Convert all tables and columns to utf8mb4 to support Arabic text and CPR Smart Card addresses
+        try {
+            $db->exec("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;");
+            $db->exec("SET CHARACTER SET utf8mb4;");
+        } catch (Exception $e) {}
+
+        $tablesToConvert = ['patients', 'doctors', 'appointments', 'branches', 'users', 'patient_vitals', 'patient_attachments', 'dental_services', 'system_settings', 'sync_logs'];
+        foreach ($tablesToConvert as $tbl) {
+            try {
+                $db->exec("ALTER TABLE `$tbl` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;");
+            } catch (Exception $e) {}
+        }
     } catch (Exception $e) {
         // Silently continue if permissions or already modified
     }
