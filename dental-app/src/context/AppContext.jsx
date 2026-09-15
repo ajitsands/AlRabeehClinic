@@ -402,11 +402,32 @@ export function AppProvider({ children }) {
       const prefix = targetBranch?.prefix || `ARB-${targetBranch?.code || 'MNM'}`;
       const yearShort = new Date().getFullYear().toString().slice(-2); // e.g. "26"
 
-      // Count existing patients for this branch prefix
-      const count = await db.patients.where('home_branch_id').equals(branchId).count();
-      const nextSeq = String(count + 1).padStart(4, '0');
+      // Find all patients for this branch (by home_branch_id or matching prefix)
+      const branchPatients = await db.patients
+        .filter(p => p.home_branch_id === branchId || (p.file_number && p.file_number.startsWith(prefix)))
+        .toArray();
+
+      let maxSeq = 0;
+      const regex = new RegExp(`^${prefix}-${yearShort}-(\\d+)$`, 'i');
+
+      branchPatients.forEach(p => {
+        if (p.file_number) {
+          const match = p.file_number.match(regex);
+          if (match && match[1]) {
+            const num = parseInt(match[1], 10);
+            if (!isNaN(num) && num > maxSeq) {
+              maxSeq = num;
+            }
+          }
+        }
+      });
+
+      // If existing sequence found, take maxSeq + 1; otherwise fallback to count + 1
+      const nextSeqNumber = maxSeq > 0 ? maxSeq + 1 : Math.max(branchPatients.length + 1, 1);
+      const nextSeq = String(nextSeqNumber).padStart(4, '0');
       return `${prefix}-${yearShort}-${nextSeq}`;
     } catch (e) {
+      console.error('Error generating branch file number:', e);
       const yearShort = new Date().getFullYear().toString().slice(-2);
       return `ARB-GEN-${yearShort}-${Date.now().toString().slice(-4)}`;
     }
