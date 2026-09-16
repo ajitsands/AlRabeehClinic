@@ -899,16 +899,18 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
                     title={duplicateCprPatient ? 'CPR Number is locked to protect file identification' : ''}
                   />
                   {duplicateCprPatient && (
-                    <div className="mt-1.5 p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-[11px] leading-tight flex items-start gap-2 shadow-xs">
+                    <div className="mt-2 p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-[11px] leading-tight flex items-start gap-2.5 shadow-xs">
                       <ShieldCheck className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                      <div>
-                        <div className="flex items-center gap-1.5 font-bold text-amber-900 dark:text-amber-200">
-                          <span>Existing Patient File:</span>
-                          <span className="px-1.5 py-0.5 rounded bg-amber-200 dark:bg-amber-900 text-amber-900 dark:text-amber-100 font-mono text-[10px]">
+                      <div className="min-w-0 flex-1">
+                        <div className="font-bold text-amber-900 dark:text-amber-200 text-xs">
+                          Existing Patient File
+                        </div>
+                        <div className="mt-1">
+                          <span className="inline-block px-2.5 py-0.5 rounded-md bg-amber-200 dark:bg-amber-900 text-amber-950 dark:text-amber-100 font-mono font-bold text-xs tracking-wider border border-amber-300 dark:border-amber-700 whitespace-nowrap shadow-2xs">
                             {duplicateCprPatient.file_number}
                           </span>
                         </div>
-                        <p className="mt-0.5 text-slate-600 dark:text-slate-300">
+                        <p className="mt-1.5 text-slate-600 dark:text-slate-300 text-[11px] leading-relaxed">
                           CPR and Names are locked. You can modify card expiry, phone, address, nationality, photo & clinical alerts below, then click Update.
                         </p>
                       </div>
