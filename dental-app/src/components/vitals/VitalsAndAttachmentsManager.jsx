@@ -212,6 +212,7 @@ export default function VitalsAndAttachmentsManager({ activePatientId, onBackToL
 
   // Delete Attachment Confirmation Modal State
   const [attachmentToDelete, setAttachmentToDelete] = useState(null);
+  const [vitalToDelete, setVitalToDelete] = useState(null);
 
   // Helper to categorize attachment file formats
   const getAttachmentType = (att) => {
@@ -582,6 +583,22 @@ export default function VitalsAndAttachmentsManager({ activePatientId, onBackToL
     loadData();
   };
 
+  // Delete Vital Handler & Custom Confirmation
+  const handleDeleteVitalClick = (vit, e) => {
+    if (e) e.stopPropagation();
+    setVitalToDelete(vit);
+  };
+
+  const handleConfirmDeleteVital = async () => {
+    if (!vitalToDelete) return;
+    const { id } = vitalToDelete;
+    setVitalToDelete(null);
+    await db.vitals.delete(id);
+    await syncEngine.queueChange('vitals', id, 'DELETE', { id });
+    showToast('Patient vital record deleted', 'info');
+    loadData();
+  };
+
   const getPainFace = (score) => {
     if (score <= 3) return <Smile className="w-5 h-5 text-emerald-500" />;
     if (score <= 6) return <Meh className="w-5 h-5 text-amber-500" />;
@@ -771,6 +788,7 @@ export default function VitalsAndAttachmentsManager({ activePatientId, onBackToL
                     <th className="p-3.5">Weight</th>
                     <th className="p-3.5">Pain (0-10)</th>
                     <th className="p-3.5">Clinical Notes</th>
+                    <th className="p-3.5 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -809,12 +827,22 @@ export default function VitalsAndAttachmentsManager({ activePatientId, onBackToL
                       <td className="p-3.5 text-slate-600 dark:text-slate-400 max-w-xs truncate">
                         {v.clinical_notes || '-'}
                       </td>
+                      <td className="p-3.5 text-right whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={(e) => handleDeleteVitalClick(v, e)}
+                          title="Delete this vital record"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition inline-flex items-center justify-center"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
                     </tr>
                   ))}
 
                   {vitalsList.length === 0 && (
                     <tr>
-                      <td colSpan={9} className="p-8 text-center text-slate-400">
+                      <td colSpan={10} className="p-8 text-center text-slate-400">
                         No vitals recorded yet. Click "Log Vitals" above to record initial reading.
                       </td>
                     </tr>
@@ -1367,6 +1395,62 @@ export default function VitalsAndAttachmentsManager({ activePatientId, onBackToL
               >
                 <Trash2 className="w-4 h-4" />
                 <span>Delete File</span>
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* CUSTOM CONFIRMATION MODAL: DELETE VITAL RECORD */}
+      {vitalToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-md p-4 animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 text-center animate-scaleUp">
+            
+            {/* Warning Icon Badge */}
+            <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-rose-100 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-900/60 flex items-center justify-center text-rose-600 dark:text-rose-400 shadow-inner">
+              <Trash2 className="w-7 h-7 animate-bounce" />
+            </div>
+
+            <h3 className="font-bold text-lg text-slate-900 dark:text-white mb-1.5">
+              Delete Vital Reading?
+            </h3>
+
+            {/* Target Vital Preview Box */}
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-200/70 dark:border-slate-700 text-left my-4">
+              <div className="flex items-center justify-between text-xs font-bold text-slate-900 dark:text-white">
+                <span>BP: {vitalToDelete.bp_systolic}/{vitalToDelete.bp_diastolic} mmHg</span>
+                <span className="text-slate-500 font-medium">{formatDate(vitalToDelete.recorded_at)}</span>
+              </div>
+              <div className="flex items-center gap-2 mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                <span>Pulse: {vitalToDelete.pulse_bpm} bpm</span>
+                <span>•</span>
+                <span>SpO2: {vitalToDelete.spo2_percent}%</span>
+                <span>•</span>
+                <span>Temp: {vitalToDelete.temperature_c}°C</span>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
+              Are you sure you want to permanently delete this vital reading? It will be removed from your local database and server database across all browsers.
+            </p>
+
+            {/* Modal Actions */}
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setVitalToDelete(null)}
+                className="flex-1 py-2.5 px-4 rounded-xl font-bold text-xs text-slate-700 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteVital}
+                className="flex-1 py-2.5 px-4 rounded-xl font-bold text-xs text-white bg-rose-600 hover:bg-rose-700 shadow-lg shadow-rose-600/25 transition flex items-center justify-center gap-1.5"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Delete Reading</span>
               </button>
             </div>
 

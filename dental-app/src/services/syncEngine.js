@@ -392,6 +392,64 @@ class SyncEngine {
         }
       }
 
+      // 9. Reconcile Deletions: Remove local items that were deleted on the server (preserving pending local creations)
+      try {
+        const pendingItems = await db.outbox_sync.where('status').equals('PENDING').toArray();
+        const pendingEntityIds = new Set(pendingItems.map(p => p.entityId));
+
+        if (Array.isArray(vitals)) {
+          const serverVitalIds = new Set(vitals.map(v => v.id));
+          const localVitals = await db.vitals.toArray();
+          for (const lv of localVitals) {
+            if (!serverVitalIds.has(lv.id) && !pendingEntityIds.has(lv.id)) {
+              await db.vitals.delete(lv.id);
+            }
+          }
+        }
+
+        if (Array.isArray(attachments)) {
+          const serverAttachIds = new Set(attachments.map(a => a.id));
+          const localAtts = await db.attachments.toArray();
+          for (const la of localAtts) {
+            if (!serverAttachIds.has(la.id) && !pendingEntityIds.has(la.id)) {
+              await db.attachments.delete(la.id);
+            }
+          }
+        }
+
+        if (Array.isArray(appointments)) {
+          const serverApptIds = new Set(appointments.map(a => a.id));
+          const localAppts = await db.appointments.toArray();
+          for (const la of localAppts) {
+            if (!serverApptIds.has(la.id) && !pendingEntityIds.has(la.id)) {
+              await db.appointments.delete(la.id);
+            }
+          }
+        }
+
+        if (Array.isArray(patients)) {
+          const serverPatIds = new Set(patients.map(p => p.id));
+          const localPatients = await db.patients.toArray();
+          for (const lp of localPatients) {
+            if (!serverPatIds.has(lp.id) && !pendingEntityIds.has(lp.id)) {
+              await db.patients.delete(lp.id);
+            }
+          }
+        }
+
+        if (Array.isArray(doctors)) {
+          const serverDocIds = new Set(doctors.map(d => d.id));
+          const localDocs = await db.doctors.toArray();
+          for (const ld of localDocs) {
+            if (!serverDocIds.has(ld.id) && !pendingEntityIds.has(ld.id)) {
+              await db.doctors.delete(ld.id);
+            }
+          }
+        }
+      } catch (delReconcileErr) {
+        console.warn('Deletion reconciliation notice:', delReconcileErr);
+      }
+
       localStorage.setItem('last_server_pull_time', resJson.serverTime || new Date().toISOString());
       this.emit('pullSuccess', { pulledCount, serverTime: resJson.serverTime });
       return { success: true, count: pulledCount };
