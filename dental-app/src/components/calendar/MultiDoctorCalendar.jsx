@@ -428,36 +428,42 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
     e.preventDefault();
     if (!cancelTarget) return;
 
-    const fullReason = `${cancelReasonCategory}${cancelCustomNote ? ` — Details: ${cancelCustomNote}` : ''}`;
-    const logNote = `[CANCELLED on ${new Date().toLocaleDateString()}: ${fullReason}]`;
-    const cancelledByName = currentUser?.full_name || currentUser?.username || 'Clinic Staff';
+    try {
+      const fullReason = `${cancelReasonCategory}${cancelCustomNote ? ` — Details: ${cancelCustomNote}` : ''}`;
+      const logNote = `[CANCELLED on ${new Date().toLocaleDateString()}: ${fullReason}]`;
+      const updatedNotes = cancelTarget.notes ? `${cancelTarget.notes} | ${logNote}` : logNote;
+      const cancelledByName = currentUser?.full_name || currentUser?.username || 'Clinic Staff';
 
-    const updatedData = {
-      status: 'CANCELLED',
-      cancellation_reason: fullReason,
-      cancelled_at: new Date().toISOString(),
-      cancelled_by_id: currentUser?.id || null,
-      cancelled_by_name: cancelledByName,
-      cancelled_by_role: currentUser?.role || 'RECEPTIONIST',
-      notes: updatedNotes,
-      updated_at: new Date().toISOString()
-    };
+      const updatedData = {
+        status: 'CANCELLED',
+        cancellation_reason: fullReason,
+        cancelled_at: new Date().toISOString(),
+        cancelled_by_id: currentUser?.id || null,
+        cancelled_by_name: cancelledByName,
+        cancelled_by_role: currentUser?.role || 'RECEPTIONIST',
+        notes: updatedNotes,
+        updated_at: new Date().toISOString()
+      };
 
-    await db.appointments.update(cancelTarget.id, updatedData);
-    const updated = await db.appointments.get(cancelTarget.id);
-    await syncEngine.queueChange('appointments', cancelTarget.id, 'UPDATE', updated);
+      await db.appointments.update(cancelTarget.id, updatedData);
+      const updated = await db.appointments.get(cancelTarget.id);
+      await syncEngine.queueChange('appointments', cancelTarget.id, 'UPDATE', updated);
 
-    const ptName = cancelTarget.patient?.full_name_en || 'Patient';
-    showToast(`Appointment for ${ptName} has been cancelled. Reason logged.`, 'info');
+      const ptName = cancelTarget.patient?.full_name_en || 'Patient';
+      showToast(`Appointment for ${ptName} has been cancelled.`, 'info');
 
-    const appointmentToReschedule = cancelTarget;
-    setIsCancelModalOpen(false);
-    setCancelTarget(null);
-    loadData();
+      const appointmentToReschedule = cancelTarget;
+      setIsCancelModalOpen(false);
+      setCancelTarget(null);
+      await loadData();
 
-    // If user selected to reschedule right after cancelling
-    if (cancelRescheduleAfter) {
-      handleOpenRescheduleModal(appointmentToReschedule);
+      // If user selected to reschedule right after cancelling
+      if (cancelRescheduleAfter) {
+        handleOpenRescheduleModal(appointmentToReschedule);
+      }
+    } catch (err) {
+      console.error('Error cancelling appointment:', err);
+      showToast(`Failed to cancel appointment: ${err.message}`, 'error');
     }
   };
 
