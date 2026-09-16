@@ -272,7 +272,9 @@ class SmartCardReaderService {
     }
 
     this.isReading = false;
-    const err = new Error('Smart Card Reader service not reachable or no card inserted.');
+    const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+    const httpsHint = isHttps ? ' If accessing via HTTPS, please set "Insecure content" to "Allow" in Chrome/Edge Site Settings.' : '';
+    const err = new Error(`Smart Card Reader service not reachable or no card inserted.${httpsHint} Please ensure SCardReadServer.exe is running and the CPR card is inserted firmly.`);
     this.emit('readError', err);
     throw err;
   }
