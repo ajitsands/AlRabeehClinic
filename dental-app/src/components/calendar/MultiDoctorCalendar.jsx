@@ -787,6 +787,10 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
                           zIndex: 10
                         };
 
+                        const latestCancelled = cancelledInSlot.length > 0 ? cancelledInSlot[cancelledInSlot.length - 1] : null;
+                        const cancelledPt = latestCancelled ? patients.find(p => p.id === latestCancelled.patient_id) : null;
+                        const cancelledName = cancelledPt?.full_name_en || latestCancelled?.patient?.full_name_en || 'Cancelled Patient';
+
                         return (
                           <div
                             key={`${doc.id}-${timeSlot}`}
@@ -806,6 +810,36 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
                               } ${getStatusBadge(appStarting.status)}`}
                               title="Drag to another time/doctor to reschedule, or click for details"
                             >
+                              {/* Dedicated Red Block on Top of the Confirmed Block if slot had previous cancellations */}
+                              {cancelledInSlot.length > 0 && (
+                                <div
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setCancelledHistoryModalTarget({
+                                      doctor: doc,
+                                      timeSlot,
+                                      cancelledList: cancelledInSlot,
+                                      hasActiveBooking: true,
+                                      activeAppointment: { ...appStarting, patient: pt, service: srv, doctor: doc }
+                                    });
+                                  }}
+                                  className="-mx-3 -mt-3 mb-2 px-2.5 py-1.5 bg-rose-100/90 hover:bg-rose-200 dark:bg-rose-950/90 dark:hover:bg-rose-900 border-b border-rose-300 dark:border-rose-800 text-rose-900 dark:text-rose-200 flex items-center justify-between gap-1 text-[10px] font-bold cursor-pointer transition shadow-2xs shrink-0"
+                                  title="Click to view full cancellation history"
+                                >
+                                  <div className="flex items-center gap-1.5 truncate">
+                                    <Ban className="w-3 h-3 text-rose-600 dark:text-rose-400 shrink-0" />
+                                    <span className="truncate">
+                                      Cancelled: <strong className="font-extrabold text-rose-950 dark:text-rose-100">{cancelledName}</strong>
+                                      {cancelledInSlot.length > 1 && ` (+${cancelledInSlot.length - 1} more)`}
+                                    </span>
+                                  </div>
+                                  <span className="px-1.5 py-0.2 rounded font-black text-[9px] bg-rose-200 dark:bg-rose-900 text-rose-800 dark:text-rose-200 uppercase tracking-tight shrink-0">
+                                    CANCELLED
+                                  </span>
+                                </div>
+                              )}
+
+                              {/* Active / Confirmed Appointment Block */}
                               <div className="space-y-1">
                                 <div className="flex items-center justify-between gap-1">
                                   <div className="flex items-center gap-1.5 min-w-0">
@@ -816,28 +850,6 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
                                   </div>
                                   
                                   <div className="flex items-center gap-1 shrink-0">
-                                    {/* Previous Cancellation Badge if any occurred in this slot */}
-                                    {cancelledInSlot.length > 0 && (
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setCancelledHistoryModalTarget({
-                                            doctor: doc,
-                                            timeSlot,
-                                            cancelledList: cancelledInSlot,
-                                            hasActiveBooking: true,
-                                            activeAppointment: { ...appStarting, patient: pt, service: srv, doctor: doc }
-                                          });
-                                        }}
-                                        className="px-1.5 py-0.5 rounded-lg bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 hover:bg-rose-200 dark:hover:bg-rose-900 border border-rose-300 dark:border-rose-800 text-[9px] font-black flex items-center gap-0.5 shadow-2xs cursor-pointer transition"
-                                        title="Click to view previous cancelled booking in this time slot"
-                                      >
-                                        <Ban className="w-2.5 h-2.5 text-rose-600 dark:text-rose-400" />
-                                        <span>{cancelledInSlot.length} Cancelled</span>
-                                      </button>
-                                    )}
-
                                     {/* 1-Click Direct Reschedule Button */}
                                     <button
                                       type="button"
@@ -884,6 +896,10 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
                       }
 
                       // Empty Slot -> Click to book or Drop Target for Drag & Drop
+                      const latestEmptyCancelled = cancelledInSlot.length > 0 ? cancelledInSlot[cancelledInSlot.length - 1] : null;
+                      const emptyCancelledPt = latestEmptyCancelled ? patients.find(p => p.id === latestEmptyCancelled.patient_id) : null;
+                      const emptyCancelledName = emptyCancelledPt?.full_name_en || latestEmptyCancelled?.patient?.full_name_en || 'Cancelled Patient';
+
                       return (
                         <div
                           key={`${doc.id}-${timeSlot}`}
@@ -909,7 +925,7 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
                             </div>
                           ) : (
                             <div className="w-full h-full flex flex-col items-center justify-center relative">
-                              {/* Small Cancelled Booking Indicator Badge */}
+                              {/* Cancelled Booking Indicator Strip with Name & Cancel Tag */}
                               {cancelledInSlot.length > 0 && (
                                 <div className="absolute top-1 inset-x-1 flex items-center justify-center z-10">
                                   <button
@@ -923,11 +939,16 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
                                         hasActiveBooking: false
                                       });
                                     }}
-                                    className="px-2 py-0.5 rounded-lg bg-rose-50/90 hover:bg-rose-100 dark:bg-rose-950/80 dark:hover:bg-rose-900 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 font-extrabold text-[10px] flex items-center gap-1 shadow-2xs transition cursor-pointer"
+                                    className="w-full px-2 py-1 rounded-xl bg-rose-100/90 hover:bg-rose-200 dark:bg-rose-950/90 dark:hover:bg-rose-900 border border-rose-300 dark:border-rose-800 text-rose-900 dark:text-rose-200 font-bold text-[10px] flex items-center justify-between gap-1 shadow-2xs transition cursor-pointer"
                                     title="Click to view cancellation history for this time slot"
                                   >
-                                    <Ban className="w-3 h-3 text-rose-500 shrink-0" />
-                                    <span>{cancelledInSlot.length === 1 ? '1 Cancelled' : `${cancelledInSlot.length} Cancelled`}</span>
+                                    <div className="flex items-center gap-1 truncate">
+                                      <Ban className="w-3 h-3 text-rose-600 dark:text-rose-400 shrink-0" />
+                                      <span className="truncate">Cancelled: <strong>{emptyCancelledName}</strong></span>
+                                    </div>
+                                    <span className="px-1.5 py-0.2 rounded text-[8px] font-black bg-rose-200 dark:bg-rose-900 text-rose-800 dark:text-rose-200 uppercase tracking-tight shrink-0">
+                                      CANCELLED
+                                    </span>
                                   </button>
                                 </div>
                               )}
