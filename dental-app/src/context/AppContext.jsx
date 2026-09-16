@@ -464,8 +464,17 @@ export function AppProvider({ children }) {
   useEffect(() => {
     async function setup() {
       await initializeDatabase();
+
+      // Immediately pull all live clinic data (doctors, patients, appointments, users, branches) from MySQL server
+      try {
+        await syncEngine.pullFromServer();
+      } catch (e) {
+        console.warn('Initial server pull notice:', e);
+      }
+
       await refreshBranches();
       await refreshUsers();
+      await reconcileDoctorAccounts();
 
       const savedSettings = await db.settings.get('clinic_settings');
       if (savedSettings) {
@@ -495,6 +504,21 @@ export function AppProvider({ children }) {
       }
     }
     setup();
+
+    // Live background polling: pull fresh records every 30s across all open browsers/devices
+    const pollInterval = setInterval(async () => {
+      try {
+        if (typeof navigator !== 'undefined' && navigator.onLine && !syncEngine.isSyncing) {
+          const res = await syncEngine.pullFromServer();
+          if (res?.count > 0) {
+            await refreshBranches();
+            await refreshUsers();
+          }
+        }
+      } catch (_) {}
+    }, 30000);
+
+    return () => clearInterval(pollInterval);
   }, []);
 
   // Listen for Smart Card & Sync Events

@@ -165,7 +165,197 @@ class SyncEngine {
     }
   }
 
-  // Trigger synchronization with intelligent size chunking and HTTP 413 fallback
+  // Pull latest clinic records from backend MySQL server into Dexie IndexedDB
+  async pullFromServer(targetUrl = this.apiUrl) {
+    if (!this.isOnline) return { success: false, message: 'Offline' };
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+      const response = await fetch(`${targetUrl}?action=pull&since=${encodeURIComponent('1970-01-01 00:00:00')}`, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' },
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`Pull returned HTTP status: ${response.status}`);
+      }
+
+      const resJson = await response.json();
+      if (!resJson || !resJson.success || !resJson.data) {
+        throw new Error('Invalid pull response structure from server');
+      }
+
+      const { branches, users, patients, appointments, doctors, services } = resJson.data;
+      let pulledCount = 0;
+
+      // 1. Ingest Branches
+      if (Array.isArray(branches) && branches.length > 0) {
+        for (const b of branches) {
+          const item = {
+            id: b.id,
+            code: b.code,
+            name: b.name,
+            prefix: b.prefix,
+            phone: b.phone || '',
+            address: b.address || '',
+            color: b.color || '#2563EB',
+            country: b.country || 'Bahrain',
+            currency_code: b.currency_code || 'BHD',
+            currency_symbol: b.currency_symbol || 'BD',
+            currency_decimals: Number(b.currency_decimals !== null && b.currency_decimals !== undefined ? b.currency_decimals : 3),
+            timezone: b.timezone || 'Asia/Bahrain',
+            date_format: b.date_format || 'DD/MM/YYYY',
+            is_active: b.is_active === 1 || b.is_active === true || b.is_active === '1',
+            created_at: b.created_at,
+            updated_at: b.updated_at
+          };
+          await db.branches.put(item);
+          pulledCount++;
+        }
+      }
+
+      // 2. Ingest Users
+      if (Array.isArray(users) && users.length > 0) {
+        for (const u of users) {
+          const item = {
+            id: u.id,
+            username: u.username,
+            full_name: u.full_name,
+            branch_id: u.branch_id || null,
+            role: u.role || 'RECEPTIONIST',
+            phone: u.phone || '',
+            email: u.email || '',
+            is_active: u.is_active === 1 || u.is_active === true || u.is_active === '1',
+            created_at: u.created_at,
+            updated_at: u.updated_at
+          };
+          await db.users.put(item);
+          pulledCount++;
+        }
+      }
+
+      // 3. Ingest Doctors
+      if (Array.isArray(doctors) && doctors.length > 0) {
+        for (const d of doctors) {
+          const item = {
+            id: d.id,
+            name: d.name,
+            specialty: d.specialty || 'General Dental Surgeon',
+            qualification: d.qualification || 'BDS Dental Surgeon',
+            primary_branch_id: d.primary_branch_id || 'branch-mnm',
+            room_number: d.room_number || 'Room 101',
+            chair_number: d.chair_number || 'Chair 1',
+            phone: d.phone || '',
+            email: d.email || '',
+            photo_url: d.photo_url || '',
+            color_tag: d.color_tag || '#2563EB',
+            start_time: d.start_time || '09:00',
+            end_time: d.end_time || '17:30',
+            slot_duration_mins: Number(d.slot_duration_mins || 30),
+            is_active: d.is_active === 1 || d.is_active === true || d.is_active === '1',
+            created_at: d.created_at,
+            updated_at: d.updated_at
+          };
+          await db.doctors.put(item);
+          pulledCount++;
+        }
+      }
+
+      // 4. Ingest Services
+      if (Array.isArray(services) && services.length > 0) {
+        for (const s of services) {
+          const item = {
+            id: s.id,
+            name: s.name,
+            category: s.category || 'General',
+            price: Number(s.price || 0),
+            default_duration_mins: Number(s.default_duration_mins || 30),
+            required_slots: Number(s.required_slots || 1),
+            description: s.description || '',
+            is_active: s.is_active === 1 || s.is_active === true || s.is_active === '1',
+            created_at: s.created_at,
+            updated_at: s.updated_at
+          };
+          await db.services.put(item);
+          pulledCount++;
+        }
+      }
+
+      // 5. Ingest Patients
+      if (Array.isArray(patients) && patients.length > 0) {
+        for (const p of patients) {
+          const item = {
+            id: p.id,
+            file_number: p.file_number,
+            cpr_number: p.cpr_number || '',
+            cpr_expiry: p.cpr_expiry || null,
+            home_branch_id: p.home_branch_id || 'branch-mnm',
+            created_at_branch_id: p.created_at_branch_id || 'branch-mnm',
+            full_name_en: p.full_name_en,
+            full_name_ar: p.full_name_ar || '',
+            phone: p.phone,
+            email: p.email || '',
+            dob: p.dob || null,
+            gender: p.gender || 'MALE',
+            nationality: p.nationality || '',
+            blood_group: p.blood_group || 'O+',
+            address: p.address || '',
+            emergency_contact_name: p.emergency_contact_name || '',
+            emergency_contact_phone: p.emergency_contact_phone || '',
+            photo_base64: p.photo_base64 || null,
+            allergies: p.allergies || '',
+            medical_alerts: p.medical_alerts || '',
+            source: p.source || 'MANUAL',
+            sync_version: p.sync_version || 1,
+            created_at: p.created_at,
+            updated_at: p.updated_at
+          };
+          await db.patients.put(item);
+          pulledCount++;
+        }
+      }
+
+      // 6. Ingest Appointments
+      if (Array.isArray(appointments) && appointments.length > 0) {
+        for (const a of appointments) {
+          const item = {
+            id: a.id,
+            branch_id: a.branch_id || 'branch-mnm',
+            patient_id: a.patient_id,
+            doctor_id: a.doctor_id,
+            service_id: a.service_id || null,
+            appointment_date: a.appointment_date,
+            start_time: a.start_time,
+            end_time: a.end_time,
+            slot_count: Number(a.slot_count || 1),
+            duration_mins: Number(a.duration_mins || 30),
+            status: a.status || 'CONFIRMED',
+            chief_complaint: a.chief_complaint || '',
+            notes: a.notes || '',
+            estimated_fee: Number(a.estimated_fee || 0),
+            created_at: a.created_at,
+            updated_at: a.updated_at
+          };
+          await db.appointments.put(item);
+          pulledCount++;
+        }
+      }
+
+      localStorage.setItem('last_server_pull_time', resJson.serverTime || new Date().toISOString());
+      this.emit('pullSuccess', { pulledCount, serverTime: resJson.serverTime });
+      return { success: true, count: pulledCount };
+
+    } catch (err) {
+      console.warn('Server pull error:', err);
+      return { success: false, error: err.message };
+    }
+  }
+
+  // Trigger synchronization: Pushes local changes & Pulls latest server records
   async syncNow({ forceMock = false } = {}) {
     if (this.isSyncing) return { success: false, message: 'Sync already in progress' };
     this.isSyncing = true;
@@ -173,19 +363,6 @@ class SyncEngine {
 
     try {
       const pendingItems = await db.outbox_sync.where('status').equals('PENDING').toArray();
-
-      if (pendingItems.length === 0) {
-        this.lastSyncTime = new Date().toISOString();
-        localStorage.setItem('last_sync_time', this.lastSyncTime);
-        this.isSyncing = false;
-        this.emit('syncSuccess', {
-          lastSync: this.lastSyncTime,
-          pendingCount: 0,
-          syncedCount: 0,
-          message: 'All records are up to date'
-        });
-        return { success: true, count: 0, message: 'Queue is empty' };
-      }
 
       // Handle Mock / Local Simulation Sync (e.g. for offline dev or test)
       if (forceMock) {
@@ -206,125 +383,130 @@ class SyncEngine {
         return { success: true, count: pendingItems.length, message: `Simulated sync for ${pendingItems.length} records.` };
       }
 
-      // Group items into size-safe batches to prevent HTTP 413 (Request Entity Too Large)
-      const batches = [];
-      let currentBatch = [];
-      let currentBatchSizeBytes = 0;
-      const MAX_BATCH_BYTES = 300 * 1024; // 300 KB safe chunk threshold
-      const MAX_BATCH_ITEMS = 10;
-
-      for (const item of pendingItems) {
-        const itemSize = JSON.stringify(item).length;
-        // Large items (attachments or items > 300KB) get their own dedicated single-item batch
-        if (item.entityType === 'attachments' || itemSize > MAX_BATCH_BYTES) {
-          if (currentBatch.length > 0) {
-            batches.push(currentBatch);
-            currentBatch = [];
-            currentBatchSizeBytes = 0;
-          }
-          batches.push([item]);
-        } else {
-          if (currentBatch.length >= MAX_BATCH_ITEMS || (currentBatchSizeBytes + itemSize > MAX_BATCH_BYTES && currentBatch.length > 0)) {
-            batches.push(currentBatch);
-            currentBatch = [item];
-            currentBatchSizeBytes = itemSize;
-          } else {
-            currentBatch.push(item);
-            currentBatchSizeBytes += itemSize;
-          }
-        }
-      }
-      if (currentBatch.length > 0) {
-        batches.push(currentBatch);
-      }
-
       let totalSynced = 0;
       const errors = [];
       const deviceId = localStorage.getItem('clinic_device_id') || 'BROWSER_CLIENT_1';
 
-      for (const batch of batches) {
-        try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 45000); // 45s for large attachments
+      if (pendingItems.length > 0) {
+        // Group items into size-safe batches to prevent HTTP 413 (Request Entity Too Large)
+        const batches = [];
+        let currentBatch = [];
+        let currentBatchSizeBytes = 0;
+        const MAX_BATCH_BYTES = 300 * 1024; // 300 KB safe chunk threshold
+        const MAX_BATCH_ITEMS = 10;
 
-          const response = await fetch(`${this.apiUrl}?action=push`, {
-            method: 'POST',
-            signal: controller.signal,
-            headers: { 
-              'Content-Type': 'application/json',
-              'Accept': 'application/json'
-            },
-            body: JSON.stringify({
-              deviceId,
-              items: batch
-            })
-          });
-          clearTimeout(timeoutId);
-
-          if (!response.ok) {
-            if (response.status === 413) {
-              // If batch got 413 and had multiple items, attempt item-by-item fallback
-              if (batch.length > 1) {
-                for (const singleItem of batch) {
-                  try {
-                    const singleRes = await fetch(`${this.apiUrl}?action=push`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                      body: JSON.stringify({ deviceId, items: [singleItem] })
-                    });
-                    if (singleRes.ok) {
-                      const singleJson = await singleRes.json();
-                      if (singleJson.success && singleJson.results?.syncedIds?.includes(singleItem.id)) {
-                        await db.outbox_sync.delete(singleItem.auto_id);
-                        totalSynced++;
-                      }
-                    } else {
-                      errors.push(`Item ${singleItem.entityType} (${singleItem.id}): HTTP ${singleRes.status}`);
-                    }
-                  } catch (itemErr) {
-                    errors.push(`Item ${singleItem.entityType}: ${itemErr.message}`);
-                  }
-                }
-                continue;
-              } else {
-                errors.push(`Attachment "${batch[0]?.payload?.file_name || batch[0]?.id}" exceeds server upload limits (HTTP 413)`);
-                continue;
-              }
+        for (const item of pendingItems) {
+          const itemSize = JSON.stringify(item).length;
+          // Large items (attachments or items > 300KB) get their own dedicated single-item batch
+          if (item.entityType === 'attachments' || itemSize > MAX_BATCH_BYTES) {
+            if (currentBatch.length > 0) {
+              batches.push(currentBatch);
+              currentBatch = [];
+              currentBatchSizeBytes = 0;
             }
-            throw new Error(`Server returned HTTP ${response.status} (${response.statusText || 'Endpoint Error'})`);
+            batches.push([item]);
+          } else {
+            if (currentBatch.length >= MAX_BATCH_ITEMS || (currentBatchSizeBytes + itemSize > MAX_BATCH_BYTES && currentBatch.length > 0)) {
+              batches.push(currentBatch);
+              currentBatch = [item];
+              currentBatchSizeBytes = itemSize;
+            } else {
+              currentBatch.push(item);
+              currentBatchSizeBytes += itemSize;
+            }
           }
+        }
+        if (currentBatch.length > 0) {
+          batches.push(currentBatch);
+        }
 
-          let resJson = null;
-          const rawText = await response.text();
+        for (const batch of batches) {
           try {
-            resJson = JSON.parse(rawText);
-          } catch (jsonErr) {
-            console.warn('Non-JSON response received:', rawText.substring(0, 300));
-            const match = rawText.match(/<b>(?:Fatal error|Warning|Notice)<\/b>:(.*?)(?:<br|\n|$)/i);
-            const cleanErr = match ? match[1].replace(/<[^>]*>?/gm, '').trim() : `Server returned non-JSON format (HTTP ${response.status})`;
-            errors.push(cleanErr);
-            continue;
-          }
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 45000); // 45s for large attachments
 
-          if (resJson && resJson.success) {
-            const syncedIds = resJson.results?.syncedIds || [];
-            for (const item of batch) {
-              if (syncedIds.includes(item.id)) {
-                await db.outbox_sync.delete(item.auto_id);
-                totalSynced++;
+            const response = await fetch(`${this.apiUrl}?action=push`, {
+              method: 'POST',
+              signal: controller.signal,
+              headers: { 
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+              },
+              body: JSON.stringify({
+                deviceId,
+                items: batch
+              })
+            });
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+              if (response.status === 413) {
+                // If batch got 413 and had multiple items, attempt item-by-item fallback
+                if (batch.length > 1) {
+                  for (const singleItem of batch) {
+                    try {
+                      const singleRes = await fetch(`${this.apiUrl}?action=push`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                        body: JSON.stringify({ deviceId, items: [singleItem] })
+                      });
+                      if (singleRes.ok) {
+                        const singleJson = await singleRes.json();
+                        if (singleJson.success && singleJson.results?.syncedIds?.includes(singleItem.id)) {
+                          await db.outbox_sync.delete(singleItem.auto_id);
+                          totalSynced++;
+                        }
+                      } else {
+                        errors.push(`Item ${singleItem.entityType} (${singleItem.id}): HTTP ${singleRes.status}`);
+                      }
+                    } catch (itemErr) {
+                      errors.push(`Item ${singleItem.entityType}: ${itemErr.message}`);
+                    }
+                  }
+                  continue;
+                } else {
+                  errors.push(`Attachment "${batch[0]?.payload?.file_name || batch[0]?.id}" exceeds server upload limits (HTTP 413)`);
+                  continue;
+                }
               }
+              throw new Error(`Server returned HTTP ${response.status} (${response.statusText || 'Endpoint Error'})`);
             }
-            if (resJson.results?.errors?.length > 0) {
-              errors.push(...resJson.results.errors.map(e => e.message || 'Record sync error'));
+
+            let resJson = null;
+            const rawText = await response.text();
+            try {
+              resJson = JSON.parse(rawText);
+            } catch (jsonErr) {
+              console.warn('Non-JSON response received:', rawText.substring(0, 300));
+              const match = rawText.match(/<b>(?:Fatal error|Warning|Notice)<\/b>:(.*?)(?:<br|\n|$)/i);
+              const cleanErr = match ? match[1].replace(/<[^>]*>?/gm, '').trim() : `Server returned non-JSON format (HTTP ${response.status})`;
+              errors.push(cleanErr);
+              continue;
             }
-          } else if (resJson) {
-            errors.push(resJson.message || 'Server rejected sync batch');
+
+            if (resJson && resJson.success) {
+              const syncedIds = resJson.results?.syncedIds || [];
+              for (const item of batch) {
+                if (syncedIds.includes(item.id)) {
+                  await db.outbox_sync.delete(item.auto_id);
+                  totalSynced++;
+                }
+              }
+              if (resJson.results?.errors?.length > 0) {
+                errors.push(...resJson.results.errors.map(e => e.message || 'Record sync error'));
+              }
+            } else if (resJson) {
+              errors.push(resJson.message || 'Server rejected sync batch');
+            }
+          } catch (batchErr) {
+            console.warn('Sync batch error:', batchErr);
+            errors.push(batchErr.message || 'Batch sync failed');
           }
-        } catch (batchErr) {
-          console.warn('Sync batch error:', batchErr);
-          errors.push(batchErr.message || 'Batch sync failed');
         }
       }
+
+      // Step 2: Always Pull Latest Records from Server to keep this client up to date
+      const pullResult = await this.pullFromServer();
 
       this.lastSyncTime = new Date().toISOString();
       localStorage.setItem('last_sync_time', this.lastSyncTime);
@@ -332,35 +514,21 @@ class SyncEngine {
       const remainingCount = await this.getPendingCount();
       this.emit('outboxUpdated', remainingCount);
 
-      if (totalSynced > 0) {
-        this.emit('syncSuccess', {
-          lastSync: this.lastSyncTime,
-          pendingCount: remainingCount,
-          syncedCount: totalSynced,
-          message: remainingCount === 0 
-            ? `Successfully synchronized all ${totalSynced} records with server`
-            : `Synchronized ${totalSynced} records (${remainingCount} remaining)`
-        });
+      this.emit('syncSuccess', {
+        lastSync: this.lastSyncTime,
+        pendingCount: remainingCount,
+        syncedCount: totalSynced,
+        pulledCount: pullResult.count || 0,
+        message: `Sync complete: Uploaded ${totalSynced} changes, Downloaded ${pullResult.count || 0} records from server.`
+      });
 
-        return {
-          success: remainingCount === 0,
-          count: totalSynced,
-          remaining: remainingCount,
-          errors: errors.length > 0 ? errors : undefined
-        };
-      } else {
-        const firstError = errors[0] || 'Sync could not be completed';
-        this.emit('syncError', {
-          error: firstError,
-          pendingCount: remainingCount
-        });
-
-        return {
-          success: false,
-          error: firstError,
-          pendingCount: remainingCount
-        };
-      }
+      return {
+        success: true,
+        count: totalSynced,
+        pulled: pullResult.count || 0,
+        remaining: remainingCount,
+        errors: errors.length > 0 ? errors : undefined
+      };
 
     } catch (err) {
       this.isSyncing = false;

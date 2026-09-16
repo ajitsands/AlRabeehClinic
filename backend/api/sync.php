@@ -149,6 +149,31 @@ function ensureSchemaUpToDate($db) {
                 $db->exec("ALTER TABLE `$tbl` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;");
             } catch (Exception $e) {}
         }
+        // 10. Ensure default branches in MySQL if empty
+        $brCount = $db->query("SELECT COUNT(*) as cnt FROM `branches`")->fetch()['cnt'] ?? 0;
+        if ($brCount == 0) {
+            $db->exec("INSERT IGNORE INTO `branches` (`id`, `code`, `name`, `prefix`, `phone`, `address`, `color`, `country`, `currency_code`, `currency_symbol`, `currency_decimals`, `timezone`, `date_format`, `is_active`) VALUES
+            ('branch-mnm', 'MNM', 'Manama Flagship Center', 'ARB-MNM', '+973 1722 3344', 'Building 124, Road 3801, Manama Center, Bahrain', '#2563EB', 'Bahrain', 'BHD', 'BD', 3, 'Asia\/Bahrain', 'DD\/MM\/YYYY', 1),
+            ('branch-rfa', 'RFA', 'Riffa Specialty Clinic', 'ARB-RFA', '+973 1777 5566', 'Villa 45, Avenue 12, East Riffa, Bahrain', '#059669', 'Bahrain', 'BHD', 'BD', 3, 'Asia\/Bahrain', 'DD\/MM\/YYYY', 1),
+            ('branch-sef', 'SEF', 'Seef Aesthetic & Implant Center', 'ARB-SEF', '+973 1758 9900', 'Medical Tower, 4th Floor, Seef District, Bahrain', '#7C3AED', 'Bahrain', 'BHD', 'BD', 3, 'Asia\/Bahrain', 'DD\/MM\/YYYY', 1),
+            ('branch-muh', 'MUH', 'Muharraq Family Dental', 'ARB-MUH', '+973 1734 1122', 'Road 2104, Block 221, Muharraq, Bahrain', '#D97706', 'Bahrain', 'BHD', 'BD', 3, 'Asia\/Bahrain', 'DD\/MM\/YYYY', 1);");
+        }
+
+        // 11. Ensure default dental services in MySQL if empty
+        $srvCount = $db->query("SELECT COUNT(*) as cnt FROM `dental_services`")->fetch()['cnt'] ?? 0;
+        if ($srvCount == 0) {
+            $db->exec("INSERT IGNORE INTO `dental_services` (`id`, `name`, `category`, `price`, `default_duration_mins`, `required_slots`, `description`, `is_active`) VALUES
+            ('srv-1', 'Comprehensive Dental Examination & Consultation', 'Diagnostics', 15.000, 30, 1, 'Full oral examination with intraoral camera inspection', 1),
+            ('srv-2', 'Digital Panoramic OPG X-Ray', 'Diagnostics', 25.000, 30, 1, 'Full mouth 2D panoramic radiograph', 1),
+            ('srv-3', 'Ultrasonic Scaling & Polishing', 'Preventive', 35.000, 30, 1, 'Complete plaque & tartar removal with stain polish', 1),
+            ('srv-4', 'Composite Aesthetic Filling (Per Tooth)', 'Restorative', 20.000, 30, 1, 'Tooth-colored composite restoration', 1),
+            ('srv-5', 'Root Canal Treatment (Molar - 3 Canals)', 'Endodontics', 85.000, 60, 2, 'Rotary endodontic therapy with bioceramic obturation', 1),
+            ('srv-6', 'Titanium Dental Implant Placement', 'Implantology', 280.000, 90, 3, 'Surgical placement of grade 5 titanium implant fixture', 1),
+            ('srv-7', 'Zirconia Aesthetic Crown (CAD/CAM)', 'Prosthodontics', 120.000, 60, 2, 'High-translucency monolithic zirconia crown', 1),
+            ('srv-8', 'Laser In-Clinic Teeth Whitening', 'Cosmetic', 110.000, 60, 2, 'Full arch diode laser whitening treatment', 1),
+            ('srv-9', 'Surgical Tooth / Impacted Molar Extraction', 'Oral Surgery', 45.000, 45, 1, 'Surgical tooth removal under local anesthesia', 1),
+            ('srv-10', 'Orthodontic Consultation & Wire Adjustment', 'Orthodontics', 25.000, 30, 1, 'Monthly bracket tightening & archwire alignment', 1);");
+        }
     } catch (Exception $e) {
         // Silently continue if permissions or already modified
     }
