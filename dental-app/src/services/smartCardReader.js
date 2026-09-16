@@ -279,29 +279,12 @@ class SmartCardReaderService {
     return results;
   }
 
-  // Trigger Smart Card Read via REST API (primary) or WebSocket fallback (SCardReadWebApi)
+  // Trigger Smart Card Read via WebSocket (primary CIO method) or REST fallback (SCardReadWebApi)
   async readSmartCard(options = {}) {
     this.isReading = true;
     this.emit('readingStart');
 
-    // 1. First attempt direct REST API (Port 5050)
-    try {
-      const restResult = await this.readViaRest(options);
-      this.isReading = false;
-      this.emit('readSuccess', restResult);
-      return restResult;
-    } catch (restErr) {
-      console.log('REST read attempt notice:', restErr.message);
-
-      // If REST threw because no card was in the slot, propagate that specific error
-      if (restErr.message && (restErr.message.includes('card has been removed') || restErr.message.includes('no card') || restErr.message.includes('No card'))) {
-        this.isReading = false;
-        this.emit('readError', restErr);
-        throw new Error('Smart Card Reader is active, but no card was detected. Please insert the patient\'s CPR chip card firmly into the reader.');
-      }
-    }
-
-    // 2. Try via WebSocket (SCardReadWebApi on Port 5060 / 5061)
+    // 1. Primary Method: WebSocket (Official SCardReadWebApi on ws://localhost:5060/SCardRead)
     try {
       const isWsConnected = await this.ensureConnected();
       if (isWsConnected && this.ws && this.ws.readyState === WebSocket.OPEN) {
@@ -388,6 +371,23 @@ class SmartCardReaderService {
         this.isReading = false;
         this.emit('readError', wsErr);
         throw wsErr;
+      }
+    }
+
+    // 2. Secondary Fallback: REST API (Port 5050)
+    try {
+      const restResult = await this.readViaRest(options);
+      this.isReading = false;
+      this.emit('readSuccess', restResult);
+      return restResult;
+    } catch (restErr) {
+      console.log('REST read attempt notice:', restErr.message);
+
+      // If REST threw because no card was in the slot, propagate that specific error
+      if (restErr.message && (restErr.message.includes('card has been removed') || restErr.message.includes('no card') || restErr.message.includes('No card'))) {
+        this.isReading = false;
+        this.emit('readError', restErr);
+        throw new Error('Smart Card Reader is active, but no card was detected. Please insert the patient\'s CPR chip card firmly into the reader.');
       }
     }
 
