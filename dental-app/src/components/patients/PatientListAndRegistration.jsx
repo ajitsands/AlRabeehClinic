@@ -23,7 +23,8 @@ import {
   ExternalLink,
   Trash2,
   Lock,
-  ShieldCheck
+  ShieldCheck,
+  Edit3
 } from 'lucide-react';
 
 export default function PatientListAndRegistration({ isRegisterModalOpen, setIsRegisterModalOpen, onSelectPatient }) {
@@ -137,6 +138,30 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
     setFormMedicalAlerts('');
     setFormPhoto('');
     setFormSource('MANUAL');
+  };
+
+  // Open Edit Modal directly from patient directory card
+  const handleOpenEditModal = (patient) => {
+    if (!patient) return;
+    setFormHomeBranchId(patient.home_branch_id || activeBranchId || 'branch-mnm');
+    setFormCpr(patient.cpr_number || '');
+    setFormCprExpiry(patient.cpr_expiry || '');
+    setFormNameEn(patient.full_name_en || '');
+    setFormNameAr(patient.full_name_ar || '');
+    setFormPhone(patient.phone || '');
+    setFormEmail(patient.email || '');
+    setFormDob(patient.dob || '');
+    setFormGender(patient.gender || 'MALE');
+    setFormNationality(patient.nationality || '');
+    setFormBloodGroup(patient.blood_group || 'O+');
+    setFormAddress(patient.address || '');
+    setFormEmergencyName(patient.emergency_contact_name || '');
+    setFormEmergencyPhone(patient.emergency_contact_phone || '');
+    setFormAllergies(patient.allergies || '');
+    setFormMedicalAlerts(patient.medical_alerts || '');
+    setFormPhoto(patient.photo_base64 || '');
+    setFormSource(patient.source || 'MANUAL');
+    setIsRegisterModalOpen(true);
   };
 
   const populateFormWithCardData = (card) => {
@@ -585,20 +610,36 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
                   <ChevronRight className="w-4 h-4" />
                 </span>
 
-                {/* Super Admin Only: Delete Patient Button */}
-                {isSuperAdmin && (
+                <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                  {/* Edit Patient Details Button */}
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setPatientToDelete(patient);
+                      handleOpenEditModal(patient);
                     }}
-                    className="p-1.5 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition cursor-pointer shrink-0"
-                    title="Super Admin Only: Delete Patient & Purge All Records"
+                    className="px-2.5 py-1 rounded-xl bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-bold flex items-center gap-1 text-[11px] transition cursor-pointer shadow-2xs border border-blue-200 dark:border-blue-800"
+                    title="Edit Patient Information (Card Expiry, Mobile, Address, Medical Alerts, etc.)"
                   >
-                    <Trash2 className="w-4 h-4 text-rose-500 hover:text-rose-600" />
+                    <Edit3 className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                    <span>Edit</span>
                   </button>
-                )}
+
+                  {/* Super Admin Only: Delete Patient Button */}
+                  {isSuperAdmin && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPatientToDelete(patient);
+                      }}
+                      className="p-1.5 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition cursor-pointer shrink-0"
+                      title="Super Admin Only: Delete Patient & Purge All Records"
+                    >
+                      <Trash2 className="w-4 h-4 text-rose-500 hover:text-rose-600" />
+                    </button>
+                  )}
+                </div>
               </div>
 
             </div>
