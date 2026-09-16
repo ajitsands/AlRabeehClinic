@@ -10,6 +10,18 @@ export default defineConfig({
   ],
   server: {
     port: 3000,
-    open: true
+    open: true,
+    proxy: {
+      '/api/operation': {
+        target: 'http://127.0.0.1:5050',
+        changeOrigin: true,
+        secure: false
+      },
+      '/SCardRead': {
+        target: 'ws://127.0.0.1:5060',
+        ws: true,
+        changeOrigin: true
+      }
+    }
   }
 });

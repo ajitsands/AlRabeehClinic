@@ -11,7 +11,7 @@ class SmartCardReaderService {
     this.isReading = false;
     this.listeners = new Map();
     this.wsUrl = 'ws://localhost:5060/SCardRead';
-    this.restUrl = 'http://localhost:5050/api/operation/ReadCard';
+    this.restUrl = 'http://127.0.0.1:5050/api/operation/ReadCard';
     this.readers = [];
   }
 
@@ -189,53 +189,65 @@ class SmartCardReaderService {
     };
 
     // 1. Test REST Service (Port 5050)
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2000);
-      const res = await fetch(restUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'text/plain'
-        },
-        body: JSON.stringify({
-          ReadCardInfo: true,
-          ReadPersonalInfo: true,
-          ReadAddressDetails: true,
-          ReadBiometrics: false,
-          ReadEmploymentInfo: false,
-          ReadImmigrationDetails: false,
-          ReadTrafficDetails: false,
-          SilentReading: false,
-          ReaderIndex: -1,
-          ReaderName: "",
-          OutputFormat: "JSON",
-          ValidateCard: false
-        }),
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
+    const testEndpoints = [
+      'http://127.0.0.1:5050/api/operation/ReadCard',
+      'http://localhost:5050/api/operation/ReadCard',
+      '/api/operation/ReadCard',
+      restUrl
+    ];
 
-      if (res.ok) {
-        const data = await res.json();
-        results.rest.ok = true;
-        const misc = data.MiscellaneousTextData || {};
-        const cpr = data.IdNumber || data.CPR || misc.CPRNO;
-        const name = data.EnglishFullName || misc.FirstNameEnglish;
+    for (const ep of testEndpoints) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2000);
+        const res = await fetch(ep, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'text/plain'
+          },
+          body: JSON.stringify({
+            ReadCardInfo: true,
+            ReadPersonalInfo: true,
+            ReadAddressDetails: true,
+            ReadBiometrics: false,
+            ReadEmploymentInfo: false,
+            ReadImmigrationDetails: false,
+            ReadTrafficDetails: false,
+            SilentReading: false,
+            ReaderIndex: -1,
+            ReaderName: "",
+            OutputFormat: "JSON",
+            ValidateCard: false
+          }),
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
 
-        if (cpr || name) {
-          results.hasCard = true;
-          results.rest.message = `CPR Card detected & readable: ${name || cpr} (CPR: ${cpr || 'Active'})`;
-        } else if (data.ErrorDescription && (data.ErrorDescription.includes('removed') || data.ErrorDescription.includes('smart card') || data.ErrorDescription.includes('no card'))) {
-          results.rest.message = 'Service active & USB reader detected (Ready for card insertion)';
-        } else {
-          results.rest.message = data.ErrorDescription || 'REST service operational on port 5050';
+        if (res.ok) {
+          const data = await res.json();
+          results.rest.ok = true;
+          this.restUrl = ep;
+          const misc = data.MiscellaneousTextData || {};
+          const cpr = data.IdNumber || data.CPR || misc.CPRNO;
+          const name = data.EnglishFullName || misc.FirstNameEnglish;
+
+          if (cpr || name) {
+            results.hasCard = true;
+            results.rest.message = `CPR Card detected & readable: ${name || cpr} (CPR: ${cpr || 'Active'})`;
+          } else if (data.ErrorDescription && (data.ErrorDescription.includes('removed') || data.ErrorDescription.includes('smart card') || data.ErrorDescription.includes('no card') || data.ErrorDescription.includes('not detected'))) {
+            results.rest.message = 'Card Reader Bridge active & USB reader detected (Ready for card insertion)';
+          } else {
+            results.rest.message = data.ErrorDescription || `Bridge operational on ${ep}`;
+          }
+          break;
         }
-      } else {
-        results.rest.message = `HTTP ${res.status}`;
+      } catch (e) {
+        // Try next endpoint
       }
-    } catch (e) {
-      results.rest.ok = false;
-      results.rest.message = e.name === 'AbortError' ? 'REST endpoint timed out' : (e.message || 'REST offline');
+    }
+
+    if (!results.rest.ok) {
+      results.rest.message = 'Smart Card Bridge offline';
     }
 
     // 2. Test WebSocket Service (Port 5060 / 5061)
@@ -388,48 +400,80 @@ class SmartCardReaderService {
   }
 
   async readViaRest(options = {}) {
-    const targetUrl = options.restUrl || this.restUrl;
-    const response = await fetch(targetUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'text/plain'
-      },
-      body: JSON.stringify({
-        ReadCardInfo: true,
-        ReadPersonalInfo: true,
-        ReadAddressDetails: true,
-        ReadBiometrics: true,
-        ReadEmploymentInfo: true,
-        ReadImmigrationDetails: true,
-        ReadTrafficDetails: false,
-        SilentReading: false,
-        ReaderIndex: -1,
-        ReaderName: options.readerName || "",
-        OutputFormat: "JSON",
-        ValidateCard: false
-      })
+    const candidateUrls = [
+      'http://127.0.0.1:5050/api/operation/ReadCard',
+      'http://localhost:5050/api/operation/ReadCard',
+      '/api/operation/ReadCard',
+      options.restUrl || this.restUrl
+    ];
+
+    const payload = JSON.stringify({
+      ReadCardInfo: true,
+      ReadPersonalInfo: true,
+      ReadAddressDetails: true,
+      ReadBiometrics: false,
+      ReadEmploymentInfo: true,
+      ReadImmigrationDetails: true,
+      ReadTrafficDetails: false,
+      SilentReading: false,
+      ReaderIndex: -1,
+      ReaderName: options.readerName || "",
+      OutputFormat: "JSON",
+      ValidateCard: false
     });
 
-    if (!response.ok) {
-      throw new Error(`REST reader service returned HTTP status: ${response.status}`);
+    let lastError = null;
+
+    for (const targetUrl of candidateUrls) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+        const response = await fetch(targetUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'text/plain'
+          },
+          body: payload,
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          lastError = new Error(`REST reader service returned HTTP status: ${response.status}`);
+          continue;
+        }
+
+        const json = await response.json();
+
+        const misc = json.MiscellaneousTextData || {};
+        const hasData = json.CPR || json.IdNumber || json.EnglishFirstName || json.EnglishFullName || misc.CPRNO || misc.FirstNameEnglish;
+
+        // If server returned an error description or no data was extracted
+        if (json.ErrorDescription && !hasData) {
+          const desc = json.ErrorDescription;
+          if (desc.includes('removed') || desc.includes('no card') || desc.includes('No card') || desc.includes('not inserted')) {
+            throw new Error('Smart Card Reader is online, but no CPR card was detected. Please ensure the card is inserted firmly with the gold chip facing the reader pins.');
+          }
+          throw new Error(desc);
+        }
+
+        if (!hasData) {
+          const errMsg = json.ErrorDescription || json.ErrorMessage || 'Card reading notice: No patient data returned. Please verify card insertion and chip orientation.';
+          throw new Error(errMsg);
+        }
+
+        return this.parseCardPayload(json);
+      } catch (err) {
+        lastError = err;
+        // If it's a card detection error from the service itself, do not try other URLs, throw immediately
+        if (err.message && (err.message.includes('no CPR card') || err.message.includes('removed') || err.message.includes('not detected'))) {
+          throw err;
+        }
+      }
     }
 
-    const json = await response.json();
-
-    const misc = json.MiscellaneousTextData || {};
-    const hasData = json.CPR || json.IdNumber || json.EnglishFirstName || json.EnglishFullName || misc.CPRNO || misc.FirstNameEnglish;
-
-    // If server returned an error description or no data was extracted
-    if (json.ErrorDescription && !hasData) {
-      throw new Error(json.ErrorDescription);
-    }
-
-    if (!hasData) {
-      const errMsg = json.ErrorDescription || json.ErrorMessage || 'Card reading error: No data returned from card. Please check card chip and orientation in reader.';
-      throw new Error(errMsg);
-    }
-
-    return this.parseCardPayload(json);
+    throw lastError || new Error('Unable to connect to Smart Card Reader service (Port 5050). Please verify SCardReadWebApi service is running.');
   }
 
   // Helper to search fields case-insensitively across nested objects

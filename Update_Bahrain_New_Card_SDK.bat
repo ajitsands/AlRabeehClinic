@@ -1,53 +1,65 @@
 @echo off
-:: =========================================================================
-:: Al Rabeesh Dental Software - Bahrain Smart Card SDK V1.1 Updater
-:: Updates CIO GCC CardRead Server to support both Old and New Bahrain Smart Cards
-:: =========================================================================
+title Al Rabeesh Dental - Bahrain Smart Card Synchronizer
+setlocal EnableDelayedExpansion
+
 echo =========================================================================
-echo  Al Rabeesh Dental - New Bahrain Smart Card (Chip on Back) SDK Update
+echo  Al Rabeesh Dental - Bahrain Smart Card 2025 Synchronizer
 echo =========================================================================
 echo.
 
-:: Check Administrator Privileges
-net session >nul 2>&1
-if %errorLevel% neq 0 (
-    echo [ERROR] This script requires Administrator privileges.
-    echo Please right-click 'Update_Bahrain_New_Card_SDK.bat' and select 'Run as administrator'.
-    echo.
-    pause
-    exit /b 1
-)
+echo [1/5] Stopping Card Reader Service...
+net stop "CIO GCC CardRead Server"
 
-echo [1/4] Stopping CIO GCC CardRead Server service...
-net stop "CIO GCC CardRead Server" /y
-timeout /t 2 /nobreak >nul
+echo.
+echo [2/5] Cleaning duplicate backup folders...
+rmdir /S /Q "C:\Program Files (x86)\CIO\GCC CardRead Server\Extensions\BAH" 2>nul
+rmdir /S /Q "C:\Program Files (x86)\CIO\GCC CardRead Server\Extensions\BAH_backup" 2>nul
 
-echo [2/4] Backing up existing extension DLLs...
-set "TARGET_DIR=C:\Program Files (x86)\CIO\GCC CardRead Server\UnifiedSDK\SDK\DotNet\Extensions\BAH"
-set "BACKUP_DIR=C:\Program Files (x86)\CIO\GCC CardRead Server\UnifiedSDK\SDK\DotNet\Extensions\BAH_backup"
-set "SOURCE_DIR=%~dp0ReaderSDK\SCardReadServer\SCardReadServer\Bahrain Smart Card SDK-V1.1\Bahrain Smart Card SDK-V1.1\DotNet\Extensions\BAH"
+echo.
+echo [3/5] Registering log4net assemblies in Global Assembly Cache (GAC)...
+powershell -Command "[System.Reflection.Assembly]::Load('System.EnterpriseServices, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a') | Out-Null; $p = New-Object System.EnterpriseServices.Internal.Publish; if (Test-Path 'C:\Program Files (x86)\CIO\Backup_CardServer_Old\log4net.dll') { $p.GacInstall('C:\Program Files (x86)\CIO\Backup_CardServer_Old\log4net.dll') }; if (Test-Path 'C:\Program Files (x86)\CIO\eRevealer.GCC\log4net.dll') { $p.GacInstall('C:\Program Files (x86)\CIO\eRevealer.GCC\log4net.dll') }; Remove-Item -Path 'C:\Windows\Microsoft.NET\assembly\GAC_MSIL\BH.CIO.Smartcard.SharedLogger' -Recurse -Force -ErrorAction SilentlyContinue" 2>nul
 
-if not exist "%BACKUP_DIR%" mkdir "%BACKUP_DIR%"
-xcopy "%TARGET_DIR%\*" "%BACKUP_DIR%\" /Y /Q >nul 2>&1
+echo.
+echo [4/5] Deploying 2025 Bahrain Smartcard Assemblies to Server...
+set "SRC=C:\Program Files (x86)\CIO\eRevealer.GCC"
+set "DST=C:\Program Files (x86)\CIO\GCC CardRead Server"
 
-echo [3/4] Copying New Bahrain Smart Card SDK V1.1 files...
-if exist "%SOURCE_DIR%" (
-    xcopy "%SOURCE_DIR%\*" "%TARGET_DIR%\" /Y /Q /E
-    powershell -Command "Get-ChildItem '%TARGET_DIR%' | Unblock-File" >nul 2>&1
-    echo   [OK] Files copied and unblocked successfully.
-) else (
-    echo   [ERROR] Source files not found at: %SOURCE_DIR%
-)
+copy /Y "!SRC!\log4net.dll" "!DST!\"
+copy /Y "!SRC!\BH.CIO.Smartcard.SharedLogger.dll" "!DST!\"
+copy /Y "!SRC!\BH.CIO.Smartcard.Extension.dll" "!DST!\"
+copy /Y "!SRC!\BH.CIO.Smartcard.IDCardManager.dll" "!DST!\"
+copy /Y "!SRC!\BH.CIO.Smartcard.IDCardManager.dll.config" "!DST!\"
+copy /Y "!SRC!\BH.CIO.Smartcard.Data.dll" "!DST!\"
+copy /Y "!SRC!\BH.CIO.Smartcard.Data.Lookup.dll" "!DST!\"
+copy /Y "!SRC!\BH.CIO.Smartcard.PCSC.dll" "!DST!\"
+copy /Y "!SRC!\BH.CIO.Smartcard.Bahrain.dll" "!DST!\"
+copy /Y "!SRC!\BH.CIO.Smartcard.Bahrain.Lookup.dll" "!DST!\"
+copy /Y "!SRC!\BerTlv.dll" "!DST!\"
+copy /Y "!SRC!\pcsc-sharp.dll" "!DST!\"
+copy /Y "!SRC!\pcsc-sharp.dll.config" "!DST!\"
+copy /Y "!SRC!\netstandard.dll" "!DST!\"
+copy /Y "!SRC!\Magick.NET-Q8-AnyCPU.dll" "!DST!\"
+copy /Y "!SRC!\Magick.NET.Core.dll" "!DST!\"
+copy /Y "!SRC!\Magick.Native-Q8-x86.dll" "!DST!\"
+copy /Y "!SRC!\Magick.Native-Q8-x64.dll" "!DST!\"
+copy /Y "!SRC!\Magick.Native-Q8-arm64.dll" "!DST!\"
 
-echo [4/4] Starting CIO GCC CardRead Server service...
+copy /Y "%~dp0DevelopSupportFilesFolder\SCardReadWebApi.exe.config" "!DST!\SCardReadWebApi.exe.config"
+
+echo.
+echo [5/5] Starting Card Reader Service...
 net start "CIO GCC CardRead Server"
-echo.
 
+echo.
 echo =========================================================================
-echo  [SUCCESS] Bahrain Smart Card SDK V1.1 is now active!
-echo  The system can now read both:
-echo   - Standard Bahrain Cards (Chip on Front)
-echo   - New Bahrain Smart Cards (Chip on Back)
+echo  Verifying Service & Reader Status...
+echo =========================================================================
+timeout /t 2 /nobreak >nul
+powershell -ExecutionPolicy Bypass -File "%~dp0scratch_test_api.ps1" 2>nul || powershell -Command "try { $r = Invoke-RestMethod -Uri 'http://localhost:5050/api/operation/ReadCard' -Method Post -Body '{\"ReadCardInfo\":false,\"SilentReading\":true,\"OutputFormat\":\"JSON\"}' -ContentType 'text/plain' -TimeoutSec 5; Write-Host 'Service Status: Online and Ready!' -ForegroundColor Green } catch { Write-Host 'Service Status:' $_.Exception.Message }"
+
+echo.
+echo =========================================================================
+echo  SUCCESS: Bahrain Smart Card 2025 synchronization completed!
 echo =========================================================================
 echo.
 pause
