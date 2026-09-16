@@ -32,10 +32,11 @@
   - `● Completed [Count]`
 
 ### ✅ C. Bahrain & GCC Smart Card Integration
-- **Direct USB Card Reader Integration**: WebSockets hook connecting to local `SCardReadServer.exe` on `ws://127.0.0.1:8080`.
-- **National CPR Card Data Extraction**: Auto-fills CPR Number, Full English Name, Full Arabic Name, Date of Birth, Gender, Nationality, Address, and CPR Photo Base64.
-- **Built-in Smart Card Simulator**: Fallback testing options with 3 Bahraini/GCC test identity presets.
-- **Settings Driver Center**: Direct one-click **"Download Now"** buttons for `eRevealerSetup 5.4.0.4.exe` (50.6MB) and `SCardReadServer.exe` (6.1MB), with copy-path utilities and live connection diagnostics.
+- **Direct USB Card Reader Integration**: High-speed REST & Diagnostic Bridge on `http://127.0.0.1:5050/api/operation/ReadCard` and `http://localhost:5050/`.
+- **Full Dual-Card Support**: Native reading for both **Old Bahrain CPR Cards (Chip on Front)** and **New 2025/2026 Smart Cards (Chip on Back - Card Version 6)**.
+- **National CPR Card Data Extraction**: Auto-fills CPR Number, Full English Name, Full Arabic Name, Date of Birth, Gender, Nationality, Address (Flat, Bldg, Road, Block), Mobile Contact Number, and CPR Photo Base64.
+- **Built-in Diagnostic Dashboard**: Interactive live browser diagnostic page at `http://localhost:5050/` showing real-time reader connection, card insertion status, and 1-click test reads.
+- **Deployment Manual**: Complete step-by-step setup and auto-start instructions in [`BAHRAIN_SMART_CARD_SETUP_GUIDE.md`](file:///E:/Al%20Rabeesh%20Software/BAHRAIN_SMART_CARD_SETUP_GUIDE.md).
 
 ### ✅ D. Patient & Doctor Directories
 - **4 Cards per Row Grid Layout**: Enforced on Patient Registry, Doctors Directory, and Dental Services catalog (`grid-cols-1 sm:grid-cols-2 lg:grid-cols-4`).

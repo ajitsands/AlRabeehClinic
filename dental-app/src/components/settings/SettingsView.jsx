@@ -33,7 +33,10 @@ import {
   Sparkles,
   ExternalLink,
   FileImage,
-  CheckCircle2
+  CheckCircle2,
+  Package,
+  Terminal,
+  Laptop
 } from 'lucide-react';
 
 const REGIONAL_PRESETS = [
@@ -1118,136 +1121,217 @@ export default function SettingsView() {
               </div>
             )}
 
-            {/* 4-Step Installation & Setup Procedure */}
+            {/* Standalone 2026 Bridge ZIP Package (Recommended for Any PC) */}
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-600/10 via-indigo-600/10 to-purple-600/10 dark:from-blue-950/40 dark:via-indigo-950/40 dark:to-purple-950/40 border border-blue-200 dark:border-blue-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Package className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  <span className="font-extrabold text-sm text-slate-900 dark:text-white">
+                    Bahrain Smart Card Bridge 2026 Standalone Package (.ZIP)
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300">
+                    ★ Recommended
+                  </span>
+                </div>
+                <p className="text-slate-600 dark:text-slate-300 text-[11px] leading-relaxed max-w-2xl">
+                  Contains the complete, pre-configured 32-bit Smart Card Server supporting <strong>both Old CPR Cards (Front Chip)</strong> and <strong>New 2025/2026 Smart Cards (Back Chip - Version 6)</strong> with 1-click launcher.
+                </p>
+                <div className="flex flex-wrap items-center gap-2 pt-1 text-[10px] text-slate-500 dark:text-slate-400 font-mono">
+                  <span>Package: Bahrain_Smart_Card_Bridge_v2026.zip (59.2 MB)</span>
+                  <span>•</span>
+                  <span>Port: 5050 (REST & HTML Diagnostics)</span>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handleCopy('E:\\Al Rabeesh Software\\downloads\\Bahrain_Smart_Card_Bridge_v2026.zip', 'zipPath', 'Package File Path')}
+                  className="px-3 py-2 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs border border-slate-200 dark:border-slate-700 flex items-center gap-1.5 shadow-xs active:scale-95 transition cursor-pointer"
+                >
+                  {copiedKey === 'zipPath' ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedKey === 'zipPath' ? 'Path Copied' : 'Copy Local Path'}</span>
+                </button>
+
+                <a
+                  href="/downloads/Bahrain_Smart_Card_Bridge_v2026.zip"
+                  download="Bahrain_Smart_Card_Bridge_v2026.zip"
+                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm active:scale-95 transition"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Download ZIP Package</span>
+                </a>
+
+                <a
+                  href="http://localhost:5050/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs border border-slate-200 dark:border-slate-700 flex items-center gap-1.5 shadow-xs transition"
+                >
+                  <ExternalLink className="w-3.5 h-3.5 text-blue-500" />
+                  <span>Open Diagnostic (Port 5050)</span>
+                </a>
+              </div>
+            </div>
+
+            {/* 4-Step Installation Procedure for Any Other Computer */}
             <div>
               <h4 className="font-bold text-slate-800 dark:text-slate-200 text-xs uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-                <Cpu className="w-4 h-4 text-blue-600" />
-                <span>Driver Installation & Hardware Setup Steps</span>
+                <Laptop className="w-4 h-4 text-blue-600" />
+                <span>How to Install & Enable on Another Computer (Reception / Doctor PC)</span>
               </h4>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {/* Step 1: Install Drivers */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                {/* Step 1: Extract Zip */}
                 <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 flex flex-col justify-between">
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <span className="font-black text-xs text-blue-600 dark:text-blue-400 uppercase tracking-wider">
-                        Step 1: Driver & Middleware Installer
+                        Step 1: Extract Package
                       </span>
                       <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300">
-                        50.6 MB
+                        Files
                       </span>
                     </div>
-                    <p className="text-slate-600 dark:text-slate-300 text-[11px] leading-relaxed mb-2">
-                      Install <strong className="text-slate-800 dark:text-slate-100">eRevealerSetup 5.4.0.4.exe</strong> to deploy PC/SC smart card drivers and Bahrain CIO ID Card native libraries.
+                    <p className="text-slate-600 dark:text-slate-300 text-[11px] leading-relaxed">
+                      Download and extract <strong className="text-slate-800 dark:text-slate-100">Bahrain_Smart_Card_Bridge_v2026.zip</strong> to <code className="bg-slate-200 dark:bg-slate-700 px-1 py-0.5 rounded">C:\Al Rabeesh Software\</code>.
                     </p>
                   </div>
-
-                  <div className="mt-2 pt-2 border-t border-slate-200/60 dark:border-slate-700 flex flex-wrap items-center justify-between gap-2">
-                    <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400 truncate">
-                      eRevealerSetup 5.4.0.4.exe
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => handleCopy('E:\\Al Rabeesh Software\\ReaderSDK\\eRevealerSetup\\eRevealerSetup 5.4.0.4.exe', 'installer', 'Installer Path')}
-                        className="px-2 py-1 rounded-lg bg-white dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold text-[10px] border border-slate-200 dark:border-slate-600 flex items-center gap-1 shrink-0 cursor-pointer"
-                      >
-                        {copiedKey === 'installer' ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-                        <span>{copiedKey === 'installer' ? 'Copied' : 'Copy'}</span>
-                      </button>
-                      <a
-                        href="/downloads/eRevealerSetup 5.4.0.4.exe"
-                        download="eRevealerSetup 5.4.0.4.exe"
-                        className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10px] flex items-center gap-1 shadow-xs active:scale-95 transition"
-                      >
-                        <Download className="w-3 h-3" />
-                        <span>Download</span>
-                      </a>
-                    </div>
+                  <div className="mt-2 pt-2 border-t border-slate-200/60 dark:border-slate-700 text-[10px] text-slate-500 font-mono">
+                    Includes: Bridge.exe + DLLs
                   </div>
                 </div>
 
-                {/* Step 2: Windows Service */}
+                {/* Step 2: Plug USB Reader */}
                 <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 flex flex-col justify-between">
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <span className="font-black text-xs text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
-                        Step 2: Windows Service Daemon
+                        Step 2: Plug USB Reader
                       </span>
                       <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300">
-                        6.1 MB (Port 5060)
-                      </span>
-                    </div>
-                    <p className="text-slate-600 dark:text-slate-300 text-[11px] leading-relaxed mb-2">
-                      Verify <strong className="text-slate-800 dark:text-slate-100">CIO GCC CardRead Server</strong> is running as a Windows Service or run <code className="bg-slate-200 dark:bg-slate-700 px-1 py-0.5 rounded">SCardReadServer.exe</code>.
-                    </p>
-                  </div>
-
-                  <div className="mt-2 pt-2 border-t border-slate-200/60 dark:border-slate-700 flex flex-wrap items-center justify-between gap-2">
-                    <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400 truncate">
-                      SCardReadServer.exe
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => handleCopy('E:\\Al Rabeesh Software\\ReaderSDK\\SCardReadServer\\SCardReadServer\\SCardReadServer.exe', 'daemon', 'Daemon Path')}
-                        className="px-2 py-1 rounded-lg bg-white dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold text-[10px] border border-slate-200 dark:border-slate-600 flex items-center gap-1 shrink-0 cursor-pointer"
-                      >
-                        {copiedKey === 'daemon' ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-                        <span>{copiedKey === 'daemon' ? 'Copied' : 'Copy'}</span>
-                      </button>
-                      <a
-                        href="/downloads/SCardReadServer.exe"
-                        download="SCardReadServer.exe"
-                        className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10px] flex items-center gap-1 shadow-xs active:scale-95 transition"
-                      >
-                        <Download className="w-3 h-3" />
-                        <span>Download</span>
-                      </a>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Step 3: Hardware Connection */}
-                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="font-black text-xs text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
-                        Step 3: Connect USB Smart Card Reader
-                      </span>
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300">
                         Hardware
                       </span>
                     </div>
                     <p className="text-slate-600 dark:text-slate-300 text-[11px] leading-relaxed">
-                      Plug standard USB Smart Card Reader (Omnikey 3121, Identiv uTrust 2700R, or ACS ACR39U) into PC. The reader LED indicator will show solid green when ready.
+                      Plug your USB Smart Card Reader into the PC. Windows 10/11 will automatically configure the built-in CCID smartcard driver.
                     </p>
                   </div>
-                  <div className="mt-2 pt-2 border-t border-slate-200/60 dark:border-slate-700 flex items-center gap-2">
-                    <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">Supported:</span>
-                    <span className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">Omnikey • Identiv • ACS • Feitian</span>
+                  <div className="mt-2 pt-2 border-t border-slate-200/60 dark:border-slate-700 text-[10px] text-slate-500">
+                    Auto-detected by Windows
                   </div>
                 </div>
 
-                {/* Step 4: Live Card Intake */}
+                {/* Step 3: Run Launcher */}
+                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="font-black text-xs text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+                        Step 3: Run Launcher
+                      </span>
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300">
+                        Port 5050
+                      </span>
+                    </div>
+                    <p className="text-slate-600 dark:text-slate-300 text-[11px] leading-relaxed">
+                      Right-click <strong className="text-slate-800 dark:text-slate-100">Start_Bahrain_Card_Bridge.bat</strong> ➔ <strong>Run as administrator</strong>. It configures Port 5050 permissions and starts the bridge.
+                    </p>
+                  </div>
+                  <div className="mt-2 pt-2 border-t border-slate-200/60 dark:border-slate-700 text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
+                    ✓ Self-Configuring
+                  </div>
+                </div>
+
+                {/* Step 4: Auto-Start on Boot */}
                 <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 flex flex-col justify-between">
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <span className="font-black text-xs text-purple-600 dark:text-purple-400 uppercase tracking-wider">
-                        Step 4: Smart Card Reading & Testing
+                        Step 4: Auto-Start on Boot
                       </span>
                       <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300">
-                        Auto-Fill
+                        Startup
                       </span>
                     </div>
                     <p className="text-slate-600 dark:text-slate-300 text-[11px] leading-relaxed">
-                      Click <strong className="text-slate-800 dark:text-slate-100">"Scan Smart Card"</strong> in the top navbar to read CPR, names, and photo in 1 click. If card is absent, use the built-in test simulator presets.
+                      Press <kbd className="bg-slate-200 dark:bg-slate-700 px-1 rounded text-[10px]">Win+R</kbd>, type <code className="bg-slate-200 dark:bg-slate-700 px-1 py-0.5 rounded text-[10px]">shell:startup</code>, and create a shortcut to <strong className="text-slate-800 dark:text-slate-100">Start_Bahrain_Card_Bridge.bat</strong>.
                     </p>
                   </div>
-                  <div className="mt-2 pt-2 border-t border-slate-200/60 dark:border-slate-700 flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-slate-500">Live Intake:</span>
-                    <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">✓ CPR • Names • DOB • Photo</span>
+                  <div className="mt-2 pt-2 border-t border-slate-200/60 dark:border-slate-700 text-[10px] text-purple-600 dark:text-purple-400 font-bold">
+                    ✓ Runs every morning
                   </div>
+                </div>
+              </div>
+            </div>
+
+            {/* CPR Card Insertion & Orientation Guide */}
+            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 font-bold text-xs">
+                  🪪
+                </div>
+                <div>
+                  <span className="font-bold text-xs text-slate-900 dark:text-white block">
+                    Supported Bahrain National CPR Card Types:
+                  </span>
+                  <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                    • <strong>Standard Old CPR Cards:</strong> Gold chip on front ➔ Insert chip facing UP.
+                    <br />
+                    • <strong>New 2025/2026 Version 6 Cards:</strong> Gold chip on back ➔ Insert chip touching reader pins.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300">
+                  Dual-Card Engine
+                </span>
+                <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300">
+                  Full Photo & Address
+                </span>
+              </div>
+            </div>
+
+            {/* Secondary Reference / Legacy Official Installers */}
+            <div className="pt-1">
+              <h4 className="font-bold text-slate-800 dark:text-slate-200 text-xs uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <Cpu className="w-4 h-4 text-slate-500" />
+                <span>Legacy Official CIO Drivers (Optional References)</span>
+              </h4>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                  <div>
+                    <span className="font-bold text-slate-800 dark:text-slate-200 block text-xs">
+                      Official eRevealer Setup (50.6 MB)
+                    </span>
+                    <span className="text-[10px] text-slate-500">eRevealerSetup 5.4.0.4.exe</span>
+                  </div>
+                  <a
+                    href="/downloads/eRevealerSetup 5.4.0.4.exe"
+                    download="eRevealerSetup 5.4.0.4.exe"
+                    className="px-2.5 py-1 rounded-lg bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 font-bold text-[10px] flex items-center gap-1 transition"
+                  >
+                    <Download className="w-3 h-3" />
+                    <span>Download</span>
+                  </a>
+                </div>
+
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                  <div>
+                    <span className="font-bold text-slate-800 dark:text-slate-200 block text-xs">
+                      Official SCardReadServer Setup (6.1 MB)
+                    </span>
+                    <span className="text-[10px] text-slate-500">SCardReadServer.exe</span>
+                  </div>
+                  <a
+                    href="/downloads/SCardReadServer.exe"
+                    download="SCardReadServer.exe"
+                    className="px-2.5 py-1 rounded-lg bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 font-bold text-[10px] flex items-center gap-1 transition"
+                  >
+                    <Download className="w-3 h-3" />
+                    <span>Download</span>
+                  </a>
                 </div>
               </div>
             </div>

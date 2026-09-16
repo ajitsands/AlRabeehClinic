@@ -35,12 +35,7 @@ timeout /t 1 /nobreak >nul
 
 :: 3. Configure Windows URL ACL Permissions for Port 5050
 echo [3/4] Registering Port 5050 URL permissions...
-netsh http delete urlacl url=http://+:5050/ >nul 2>&1
-netsh http delete urlacl url=http://localhost:5050/ >nul 2>&1
-netsh http delete urlacl url=http://127.0.0.1:5050/ >nul 2>&1
 netsh http add urlacl url=http://+:5050/ user=Everyone >nul 2>&1
-netsh http add urlacl url=http://localhost:5050/ user=Everyone >nul 2>&1
-netsh http add urlacl url=http://127.0.0.1:5050/ user=Everyone >nul 2>&1
 
 :: 4. Start the Bridge on Port 5050
 echo [4/4] Starting Al Rabeesh Bahrain Smart Card Bridge on Port 5050...
@@ -50,6 +45,8 @@ start "Al Rabeesh Smart Card Bridge (Port 5050)" "%~dp0BahrainCardBridge\Bahrain
 echo.
 echo =========================================================================
 echo  SUCCESS: Smart Card Bridge is now RUNNING on Port 5050!
+echo  - Diagnostic Web Page: http://localhost:5050/
+echo  - REST API: http://localhost:5050/api/operation/ReadCard
 echo  You can now insert CPR card and click "Read Card" in Al Rabeesh Dental App.
 echo =========================================================================
 echo.
