@@ -52,6 +52,7 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
   const [isDeletingPatient, setIsDeletingPatient] = useState(false);
 
   // Form State for Patient Registration
+  const [editingPatientId, setEditingPatientId] = useState(null);
   const [formHomeBranchId, setFormHomeBranchId] = useState(activeBranchId || 'branch-mnm');
   const [formFileNumber, setFormFileNumber] = useState('');
   const [formCpr, setFormCpr] = useState('');
@@ -80,6 +81,12 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
 
   useEffect(() => {
     loadPatients();
+    const unsubPull = syncEngine.on('pullSuccess', () => loadPatients());
+    const unsubSync = syncEngine.on('syncSuccess', () => loadPatients());
+    return () => {
+      unsubPull();
+      unsubSync();
+    };
   }, []);
 
   // Real-time CPR duplicate detector
@@ -120,6 +127,7 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
   };
 
   const resetForm = (branchId = activeBranchId) => {
+    setEditingPatientId(null);
     setFormHomeBranchId(branchId);
     setFormCpr('');
     setFormCprExpiry('');
@@ -143,6 +151,7 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
   // Open Edit Modal directly from patient directory card
   const handleOpenEditModal = (patient) => {
     if (!patient) return;
+    setEditingPatientId(patient.id);
     setFormHomeBranchId(patient.home_branch_id || activeBranchId || 'branch-mnm');
     setFormCpr(patient.cpr_number || '');
     setFormCprExpiry(patient.cpr_expiry || '');
@@ -273,11 +282,22 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
       return;
     }
 
-    // UPDATE FLOW: If patient with this CPR already exists in clinic records
-    if (duplicateCprPatient) {
+    // UPDATE FLOW: If editing an existing patient or patient with this CPR already exists
+    const targetExistingPatient = editingPatientId 
+      ? patients.find(p => p.id === editingPatientId) 
+      : duplicateCprPatient;
+
+    if (targetExistingPatient) {
+      const cleanCpr = formCpr && formCpr.trim() 
+        ? formCpr.trim().replace(/[\s-]+/g, '') 
+        : (targetExistingPatient.cpr_number || null);
+
       const updatedPatient = {
-        ...duplicateCprPatient,
+        ...targetExistingPatient,
+        cpr_number: cleanCpr,
         cpr_expiry: formCprExpiry || null,
+        full_name_en: formNameEn.trim(),
+        full_name_ar: formNameAr ? formNameAr.trim() : (targetExistingPatient.full_name_ar || ''),
         phone: formPhone.trim(),
         email: formEmail ? formEmail.trim() : null,
         dob: formDob || null,
@@ -287,19 +307,20 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
         address: formAddress ? formAddress.trim() : '',
         emergency_contact_name: formEmergencyName ? formEmergencyName.trim() : '',
         emergency_contact_phone: formEmergencyPhone ? formEmergencyPhone.trim() : '',
-        photo_base64: formPhoto || duplicateCprPatient.photo_base64 || null,
+        photo_base64: formPhoto || targetExistingPatient.photo_base64 || null,
         allergies: formAllergies ? formAllergies.trim() : '',
         medical_alerts: formMedicalAlerts ? formMedicalAlerts.trim() : '',
-        source: formSource || duplicateCprPatient.source || 'CARD_READER',
+        source: formSource || targetExistingPatient.source || 'CARD_READER',
         updated_at: new Date().toISOString()
       };
 
-      await db.patients.update(duplicateCprPatient.id, updatedPatient);
-      await syncEngine.queueChange('patients', duplicateCprPatient.id, 'UPDATE', updatedPatient);
+      await db.patients.put(updatedPatient);
+      await syncEngine.queueChange('patients', targetExistingPatient.id, 'UPDATE', updatedPatient);
 
       confetti({ particleCount: 60, spread: 60, origin: { y: 0.6 } });
-      showToast(`Patient record "${duplicateCprPatient.full_name_en}" (${duplicateCprPatient.file_number}) updated successfully!`, 'success', 5000);
+      showToast(`Patient record "${updatedPatient.full_name_en}" (${targetExistingPatient.file_number}) updated successfully!`, 'success', 5000);
       setIsRegisterModalOpen(false);
+      setEditingPatientId(null);
       loadPatients();
       return;
     }

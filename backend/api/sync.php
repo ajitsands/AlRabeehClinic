@@ -126,14 +126,28 @@ function ensureSchemaUpToDate($db) {
             $db->exec("ALTER TABLE `doctors` MODIFY COLUMN `phone` VARCHAR(50) NULL;");
         } catch (Exception $e) {}
 
-        // 8. Ensure patient file_number, cpr_number, phone, cpr_expiry columns exist and are properly sized
+        // 8. Ensure patient file_number, cpr_number, phone, cpr_expiry, emergency contacts, etc. exist and are properly sized
         try {
             $db->exec("ALTER TABLE `patients` MODIFY COLUMN `file_number` VARCHAR(50) NOT NULL;");
             $db->exec("ALTER TABLE `patients` MODIFY COLUMN `cpr_number` VARCHAR(50) NULL;");
             $db->exec("ALTER TABLE `patients` MODIFY COLUMN `phone` VARCHAR(50) NOT NULL;");
-            $patExp = $db->query("SHOW COLUMNS FROM `patients` LIKE 'cpr_expiry'")->fetchAll();
-            if (empty($patExp)) {
-                $db->exec("ALTER TABLE `patients` ADD COLUMN `cpr_expiry` DATE NULL AFTER `cpr_number`;");
+            $db->exec("ALTER TABLE `patients` MODIFY COLUMN `photo_base64` LONGTEXT NULL;");
+            
+            $patientCols = [
+                'cpr_expiry' => "DATE NULL",
+                'emergency_contact_name' => "VARCHAR(150) NULL",
+                'emergency_contact_phone' => "VARCHAR(50) NULL",
+                'blood_group' => "VARCHAR(20) NULL",
+                'allergies' => "TEXT NULL",
+                'medical_alerts' => "TEXT NULL",
+                'nationality' => "VARCHAR(100) NULL",
+                'source' => "VARCHAR(50) NOT NULL DEFAULT 'CARD_READER'"
+            ];
+            foreach ($patientCols as $col => $type) {
+                $chk = $db->query("SHOW COLUMNS FROM `patients` LIKE '$col'")->fetchAll();
+                if (empty($chk)) {
+                    $db->exec("ALTER TABLE `patients` ADD COLUMN `$col` $type;");
+                }
             }
         } catch (Exception $e) {}
 
@@ -310,33 +324,42 @@ if ($method === 'POST' && $action === 'push') {
                         $cprCheck->execute([':cpr' => trim($payload['cpr_number']), ':id' => $payload['id']]);
                         $existingCpr = $cprCheck->fetch();
                         if ($existingCpr && $operation === 'INSERT') {
-                            // Existing patient has this CPR; mark processed and skip duplicate insert
-                            $results['processed']++;
-                            $results['syncedIds'][] = $entityId;
-                            continue;
+                            // Link to existing patient record
+                            $payload['id'] = $existingCpr['id'];
                         }
                     }
 
                     $stmt = $db->prepare("
-                        INSERT INTO patients (id, file_number, cpr_number, home_branch_id, created_at_branch_id, full_name_en, full_name_ar, phone, email, dob, gender, nationality, blood_group, address, photo_base64, allergies, medical_alerts, source, updated_at)
-                        VALUES (:id, :file_number, :cpr_number, :home_branch_id, :created_at_branch_id, :full_name_en, :full_name_ar, :phone, :email, :dob, :gender, :nationality, :blood_group, :address, :photo_base64, :allergies, :medical_alerts, :source, NOW())
+                        INSERT INTO patients (id, file_number, cpr_number, cpr_expiry, home_branch_id, created_at_branch_id, full_name_en, full_name_ar, phone, email, dob, gender, nationality, blood_group, address, emergency_contact_name, emergency_contact_phone, photo_base64, allergies, medical_alerts, source, updated_at)
+                        VALUES (:id, :file_number, :cpr_number, :cpr_expiry, :home_branch_id, :created_at_branch_id, :full_name_en, :full_name_ar, :phone, :email, :dob, :gender, :nationality, :blood_group, :address, :emergency_contact_name, :emergency_contact_phone, :photo_base64, :allergies, :medical_alerts, :source, NOW())
                         ON DUPLICATE KEY UPDATE
+                            file_number = VALUES(file_number),
+                            cpr_number = VALUES(cpr_number),
+                            cpr_expiry = VALUES(cpr_expiry),
                             home_branch_id = VALUES(home_branch_id),
                             created_at_branch_id = VALUES(created_at_branch_id),
                             full_name_en = VALUES(full_name_en),
                             full_name_ar = VALUES(full_name_ar),
                             phone = VALUES(phone),
                             email = VALUES(email),
+                            dob = VALUES(dob),
+                            gender = VALUES(gender),
+                            nationality = VALUES(nationality),
+                            blood_group = VALUES(blood_group),
                             address = VALUES(address),
+                            emergency_contact_name = VALUES(emergency_contact_name),
+                            emergency_contact_phone = VALUES(emergency_contact_phone),
                             photo_base64 = VALUES(photo_base64),
                             allergies = VALUES(allergies),
                             medical_alerts = VALUES(medical_alerts),
+                            source = VALUES(source),
                             updated_at = NOW()
                     ");
                     $stmt->execute([
                         ':id' => $payload['id'],
                         ':file_number' => $payload['file_number'],
-                        ':cpr_number' => $payload['cpr_number'] ?? null,
+                        ':cpr_number' => !empty($payload['cpr_number']) ? trim($payload['cpr_number']) : null,
+                        ':cpr_expiry' => !empty($payload['cpr_expiry']) ? $payload['cpr_expiry'] : null,
                         ':home_branch_id' => $payload['home_branch_id'] ?? 'branch-mnm',
                         ':created_at_branch_id' => $payload['created_at_branch_id'] ?? 'branch-mnm',
                         ':full_name_en' => $payload['full_name_en'],
@@ -348,6 +371,8 @@ if ($method === 'POST' && $action === 'push') {
                         ':nationality' => $payload['nationality'] ?? null,
                         ':blood_group' => $payload['blood_group'] ?? null,
                         ':address' => $payload['address'] ?? null,
+                        ':emergency_contact_name' => $payload['emergency_contact_name'] ?? null,
+                        ':emergency_contact_phone' => $payload['emergency_contact_phone'] ?? null,
                         ':photo_base64' => $payload['photo_base64'] ?? null,
                         ':allergies' => $payload['allergies'] ?? null,
                         ':medical_alerts' => $payload['medical_alerts'] ?? null,
