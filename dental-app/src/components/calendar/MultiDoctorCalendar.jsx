@@ -30,7 +30,8 @@ import {
   AlertTriangle,
   CalendarX,
   HelpCircle,
-  RotateCcw
+  RotateCcw,
+  History
 } from 'lucide-react';
 
 export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen, setIsModalOpen, preselectedSlot, setPreselectedSlot }) {
@@ -73,6 +74,9 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
   const [cancelCustomNote, setCancelCustomNote] = useState('');
   const [cancelRescheduleAfter, setCancelRescheduleAfter] = useState(false);
   const [cancelNotifyWhatsApp, setCancelNotifyWhatsApp] = useState(true);
+
+  // Time Slot Cancellation History Popup State
+  const [cancelledHistoryModalTarget, setCancelledHistoryModalTarget] = useState(null);
 
   // Form State for New Booking
   const [bookingDoctorId, setBookingDoctorId] = useState('');
@@ -733,6 +737,11 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
                       // Check if this slot is being dragged over
                       const isHoveredForDrop = dragOverTarget?.doctorId === doc.id && dragOverTarget?.timeSlot === timeSlot;
 
+                      // Check for cancelled bookings in this exact slot to render cancellation history badge
+                      const cancelledInSlot = appointments.filter(
+                        a => a.doctor_id === doc.id && a.start_time === timeSlot && a.status === 'CANCELLED'
+                      );
+
                       // 2. Check if this time slot is the START of an appointment
                       const appStarting = appointments.find(
                         a => a.doctor_id === doc.id && a.start_time === timeSlot && a.status !== 'CANCELLED'
@@ -799,6 +808,28 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
                                   </div>
                                   
                                   <div className="flex items-center gap-1 shrink-0">
+                                    {/* Previous Cancellation Badge if any occurred in this slot */}
+                                    {cancelledInSlot.length > 0 && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setCancelledHistoryModalTarget({
+                                            doctor: doc,
+                                            timeSlot,
+                                            cancelledList: cancelledInSlot,
+                                            hasActiveBooking: true,
+                                            activeAppointment: { ...appStarting, patient: pt, service: srv, doctor: doc }
+                                          });
+                                        }}
+                                        className="px-1.5 py-0.5 rounded-lg bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 hover:bg-rose-200 dark:hover:bg-rose-900 border border-rose-300 dark:border-rose-800 text-[9px] font-black flex items-center gap-0.5 shadow-2xs cursor-pointer transition"
+                                        title="Click to view previous cancelled booking in this time slot"
+                                      >
+                                        <Ban className="w-2.5 h-2.5 text-rose-600 dark:text-rose-400" />
+                                        <span>{cancelledInSlot.length} Cancelled</span>
+                                      </button>
+                                    )}
+
                                     {/* 1-Click Direct Reschedule Button */}
                                     <button
                                       type="button"
@@ -857,7 +888,7 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
                           }}
                           onDrop={() => handleDropAppointment(doc.id, timeSlot)}
                           onClick={() => handleSlotClick(doc.id, timeSlot)}
-                          className={`p-1 border-r border-slate-200 dark:border-slate-800/80 group cursor-pointer flex items-center justify-center transition-all ${
+                          className={`p-1 border-r border-slate-200 dark:border-slate-800/80 group cursor-pointer flex items-center justify-center transition-all relative ${
                             isHoveredForDrop
                               ? 'bg-blue-100/70 dark:bg-blue-900/50 ring-2 ring-blue-500 ring-inset'
                               : 'hover:bg-blue-50/50 dark:hover:bg-blue-950/20'
@@ -869,14 +900,40 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
                               <span>Drop to Move ({timeSlot})</span>
                             </div>
                           ) : (
-                            <div className="opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center gap-1 bg-white dark:bg-slate-800 px-3 py-1.5 rounded-xl shadow-md border border-blue-200 dark:border-blue-800 transition-all transform scale-95 group-hover:scale-100">
-                              <div className="flex items-center gap-1 text-[11px] font-extrabold text-blue-600 dark:text-blue-400">
-                                <Plus className="w-3.5 h-3.5" />
-                                <span>Book Slot</span>
-                              </div>
-                              <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/60 px-1.5 py-0.5 rounded-md border border-slate-200 dark:border-slate-700">
-                                <Clock className="w-2.5 h-2.5 text-blue-500" />
-                                <span>{timeSlot} - {nextSlotTime}</span>
+                            <div className="w-full h-full flex flex-col items-center justify-center relative">
+                              {/* Small Cancelled Booking Indicator Badge */}
+                              {cancelledInSlot.length > 0 && (
+                                <div className="absolute top-1 inset-x-1 flex items-center justify-center z-10">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setCancelledHistoryModalTarget({
+                                        doctor: doc,
+                                        timeSlot,
+                                        cancelledList: cancelledInSlot,
+                                        hasActiveBooking: false
+                                      });
+                                    }}
+                                    className="px-2 py-0.5 rounded-lg bg-rose-50/90 hover:bg-rose-100 dark:bg-rose-950/80 dark:hover:bg-rose-900 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 font-extrabold text-[10px] flex items-center gap-1 shadow-2xs transition cursor-pointer"
+                                    title="Click to view cancellation history for this time slot"
+                                  >
+                                    <Ban className="w-3 h-3 text-rose-500 shrink-0" />
+                                    <span>{cancelledInSlot.length === 1 ? '1 Cancelled' : `${cancelledInSlot.length} Cancelled`}</span>
+                                  </button>
+                                </div>
+                              )}
+
+                              {/* Book Slot Prompt on Hover */}
+                              <div className="opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center gap-1 bg-white dark:bg-slate-800 px-3 py-1.5 rounded-xl shadow-md border border-blue-200 dark:border-blue-800 transition-all transform scale-95 group-hover:scale-100 z-20">
+                                <div className="flex items-center gap-1 text-[11px] font-extrabold text-blue-600 dark:text-blue-400">
+                                  <Plus className="w-3.5 h-3.5" />
+                                  <span>Book Slot</span>
+                                </div>
+                                <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/60 px-1.5 py-0.5 rounded-md border border-slate-200 dark:border-slate-700">
+                                  <Clock className="w-2.5 h-2.5 text-blue-500" />
+                                  <span>{timeSlot} - {nextSlotTime}</span>
+                                </div>
                               </div>
                             </div>
                           )}
@@ -1568,6 +1625,196 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
               </div>
 
             </form>
+
+          </div>
+        </div>
+      )}
+
+      {/* TIME SLOT CANCELLATION HISTORY POPUP MODAL */}
+      {cancelledHistoryModalTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 backdrop-blur-md p-4 animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-2xl w-full p-6 sm:p-7 shadow-2xl border border-slate-200 dark:border-slate-800 max-h-[90vh] overflow-y-auto animate-scaleUp">
+            
+            {/* Header */}
+            <div className="flex items-start justify-between pb-4 border-b border-slate-100 dark:border-slate-800 gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-rose-100 dark:bg-rose-950/80 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0 shadow-xs">
+                  <History className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-lg sm:text-xl text-slate-900 dark:text-white flex items-center gap-2">
+                    <span>Slot Cancellation History</span>
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 font-black border border-rose-300 dark:border-rose-800">
+                      {cancelledHistoryModalTarget.cancelledList.length} Cancelled
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Dr. {cancelledHistoryModalTarget.doctor?.name} (Chair {cancelledHistoryModalTarget.doctor?.chair_number || '1'}) • {formatDate(selectedDate)} at {cancelledHistoryModalTarget.timeSlot}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setCancelledHistoryModalTarget(null)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Current Slot Availability Status Banner */}
+            <div className={`my-4 p-3.5 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs ${
+              cancelledHistoryModalTarget.hasActiveBooking
+                ? 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-900 text-blue-900 dark:text-blue-200'
+                : 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900 text-emerald-900 dark:text-emerald-200'
+            }`}>
+              <div className="flex items-center gap-2.5">
+                {cancelledHistoryModalTarget.hasActiveBooking ? (
+                  <User className="w-4 h-4 text-blue-600 shrink-0" />
+                ) : (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                )}
+                <div>
+                  <span className="font-black text-sm">
+                    {cancelledHistoryModalTarget.hasActiveBooking
+                      ? `Slot Currently Booked: ${cancelledHistoryModalTarget.activeAppointment?.patient?.full_name_en || 'Active Patient'}`
+                      : 'This Time Slot is Open & Available for New Bookings!'}
+                  </span>
+                  <p className="text-[11px] opacity-80 mt-0.5">
+                    {cancelledHistoryModalTarget.hasActiveBooking
+                      ? `Service: ${cancelledHistoryModalTarget.activeAppointment?.service?.name || 'Consultation'}`
+                      : 'You can take another appointment in this exact slot.'}
+                  </p>
+                </div>
+              </div>
+
+              {!cancelledHistoryModalTarget.hasActiveBooking && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const docId = cancelledHistoryModalTarget.doctor.id;
+                    const slot = cancelledHistoryModalTarget.timeSlot;
+                    setCancelledHistoryModalTarget(null);
+                    handleSlotClick(docId, slot);
+                  }}
+                  className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap self-start sm:self-auto"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Book This Slot Now</span>
+                </button>
+              )}
+            </div>
+
+            {/* List of Cancelled Bookings */}
+            <div className="space-y-3 mt-4">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                <Ban className="w-3.5 h-3.5 text-rose-500" />
+                <span>Cancelled Bookings Log ({cancelledHistoryModalTarget.cancelledList.length})</span>
+              </h4>
+
+              {cancelledHistoryModalTarget.cancelledList.map((app, idx) => {
+                const pt = patients.find(p => p.id === app.patient_id);
+                const srv = services.find(s => s.id === app.service_id);
+                return (
+                  <div
+                    key={app.id || idx}
+                    className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2.5 shadow-2xs"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-rose-100 dark:bg-rose-950/80 text-rose-600 dark:text-rose-400 flex items-center justify-center font-black text-xs shrink-0">
+                          #{idx + 1}
+                        </div>
+                        <div>
+                          <h5 className="font-bold text-sm text-slate-900 dark:text-white">
+                            {pt ? pt.full_name_en : 'Patient Record'}
+                          </h5>
+                          {pt?.full_name_ar && (
+                            <p className="text-xs text-slate-500 font-arabic">{pt.full_name_ar}</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {pt?.file_number && (
+                          <span className="px-2 py-0.5 text-[10px] font-black uppercase rounded bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-200 border border-blue-200 dark:border-blue-800">
+                            {pt.file_number}
+                          </span>
+                        )}
+                        <span className="px-2 py-0.5 text-[10px] font-black uppercase rounded bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800">
+                          CANCELLED
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Patient CPR & Contact Details */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs py-2 border-y border-slate-200/80 dark:border-slate-700/80 text-slate-600 dark:text-slate-300">
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block">CPR Number</span>
+                        <span className="font-bold text-slate-800 dark:text-slate-200">{pt?.cpr_number || 'N/A'}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block">Mobile Phone</span>
+                        <span className="font-bold text-slate-800 dark:text-slate-200">{pt?.phone || 'N/A'}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block">Service & Fee</span>
+                        <span className="font-bold text-blue-600 dark:text-blue-400 truncate block">
+                          {srv ? srv.name : 'Consultation'} ({formatCurrency(app.estimated_fee)})
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Cancellation Reason Box */}
+                    <div className="p-3 rounded-xl bg-rose-50/80 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 text-xs space-y-1">
+                      <div className="flex items-start gap-1.5 text-rose-900 dark:text-rose-200 font-bold">
+                        <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5" />
+                        <span>Reason: {app.cancellation_reason || 'Cancelled by clinic / patient'}</span>
+                      </div>
+                      {app.cancelled_at && (
+                        <div className="text-[10px] text-rose-600 dark:text-rose-400 font-medium pl-5">
+                          Cancelled on: {new Date(app.cancelled_at).toLocaleString()}
+                        </div>
+                      )}
+                      {app.notes && (
+                        <div className="text-[11px] text-slate-600 dark:text-slate-300 pl-5 italic">
+                          Notes: {app.notes}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Rebook / Reschedule Patient Button */}
+                    <div className="flex items-center justify-end pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const appToReschedule = { ...app, patient: pt, service: srv, doctor: cancelledHistoryModalTarget.doctor };
+                          setCancelledHistoryModalTarget(null);
+                          handleOpenRescheduleModal(appToReschedule);
+                        }}
+                        className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 font-bold text-xs rounded-xl flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                        <span>Rebook / Reschedule {pt?.full_name_en ? pt.full_name_en.split(' ')[0] : 'Patient'}</span>
+                      </button>
+                    </div>
+
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Footer Close */}
+            <div className="flex items-center justify-end pt-4 border-t border-slate-100 dark:border-slate-800 mt-5">
+              <button
+                type="button"
+                onClick={() => setCancelledHistoryModalTarget(null)}
+                className="px-5 py-2 text-xs font-bold text-slate-700 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-xl cursor-pointer transition"
+              >
+                Close
+              </button>
+            </div>
 
           </div>
         </div>
