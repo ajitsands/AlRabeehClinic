@@ -35,7 +35,7 @@ import {
 } from 'lucide-react';
 
 export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen, setIsModalOpen, preselectedSlot, setPreselectedSlot }) {
-  const { formatCurrency, formatDate, showToast, settings, activeBranchId, activeBranch, branches, reconcileDoctorAccounts } = useApp();
+  const { formatCurrency, formatDate, showToast, settings, activeBranchId, activeBranch, branches, reconcileDoctorAccounts, currentUser } = useApp();
 
   const timeSlots = generateClinicTimeSlots(
     settings.clinic_open_time || '09:00',
@@ -207,6 +207,8 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
 
     const srv = services.find(s => s.id === bookingServiceId);
 
+    const bookedByName = currentUser?.full_name || currentUser?.username || 'Clinic Staff';
+
     const newAppointment = {
       id: `app-${Date.now()}`,
       patient_id: bookingPatientId,
@@ -219,6 +221,9 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
       slot_count: Number(bookingSlotCount),
       duration_mins: Number(bookingDurationMins),
       status: 'CONFIRMED',
+      booked_by_id: currentUser?.id || null,
+      booked_by_name: bookedByName,
+      booked_by_role: currentUser?.role || 'RECEPTIONIST',
       chief_complaint: bookingChiefComplaint,
       notes: bookingNotes,
       estimated_fee: srv ? srv.price : 0,
@@ -425,12 +430,15 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
 
     const fullReason = `${cancelReasonCategory}${cancelCustomNote ? ` — Details: ${cancelCustomNote}` : ''}`;
     const logNote = `[CANCELLED on ${new Date().toLocaleDateString()}: ${fullReason}]`;
-    const updatedNotes = cancelTarget.notes ? `${cancelTarget.notes} | ${logNote}` : logNote;
+    const cancelledByName = currentUser?.full_name || currentUser?.username || 'Clinic Staff';
 
     const updatedData = {
       status: 'CANCELLED',
       cancellation_reason: fullReason,
       cancelled_at: new Date().toISOString(),
+      cancelled_by_id: currentUser?.id || null,
+      cancelled_by_name: cancelledByName,
+      cancelled_by_role: currentUser?.role || 'RECEPTIONIST',
       notes: updatedNotes,
       updated_at: new Date().toISOString()
     };
@@ -1736,13 +1744,20 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         {pt?.file_number && (
                           <span className="px-2 py-0.5 text-[10px] font-black uppercase rounded bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-200 border border-blue-200 dark:border-blue-800">
-                            {pt.file_number}
+                            File #{pt.file_number}
                           </span>
                         )}
-                        <span className="px-2 py-0.5 text-[10px] font-black uppercase rounded bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800">
+
+                        {/* Cancelled Person Tag Near Cancel Tag */}
+                        <span className="px-2 py-0.5 text-[10px] font-bold rounded-lg bg-rose-50 dark:bg-rose-950/80 text-rose-800 dark:text-rose-200 border border-rose-200 dark:border-rose-900 flex items-center gap-1 shadow-2xs">
+                          <UserCheck className="w-3 h-3 text-rose-600 dark:text-rose-400" />
+                          <span>Cancelled By: <strong className="font-black">{app.cancelled_by_name || 'Clinic Staff'}</strong></span>
+                        </span>
+
+                        <span className="px-2 py-0.5 text-[10px] font-black uppercase rounded bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800 shadow-2xs">
                           CANCELLED
                         </span>
                       </div>
@@ -1766,17 +1781,57 @@ export default function MultiDoctorCalendar({ onOpenPatientProfile, isModalOpen,
                       </div>
                     </div>
 
+                    {/* Confirmation Block & Cancellation Block */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                      {/* 1. Confirmation / Initial Booking Block */}
+                      <div className="p-2.5 rounded-xl bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3 text-blue-500" />
+                            <span>Confirmation & Booking</span>
+                          </span>
+                          <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300">
+                            Booked
+                          </span>
+                        </div>
+                        <p className="text-slate-800 dark:text-slate-200 font-bold text-[11px]">
+                          Booked By: <span className="text-blue-600 dark:text-blue-400">{app.booked_by_name || 'Clinic Staff'}</span>
+                        </p>
+                        {app.created_at && (
+                          <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                            Created: {new Date(app.created_at).toLocaleString()}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* 2. Cancellation Block */}
+                      <div className="p-2.5 rounded-xl bg-rose-50/90 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] uppercase font-bold text-rose-700 dark:text-rose-400 flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3 text-rose-600" />
+                            <span>Cancellation Record</span>
+                          </span>
+                          <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300">
+                            Cancelled
+                          </span>
+                        </div>
+                        <p className="text-rose-900 dark:text-rose-200 font-bold text-[11px]">
+                          Cancelled By: <span className="text-rose-700 dark:text-rose-300">{app.cancelled_by_name || 'Clinic Staff'}</span>
+                        </p>
+                        {app.cancelled_at && (
+                          <p className="text-[10px] text-rose-600 dark:text-rose-400">
+                            Cancelled on: {new Date(app.cancelled_at).toLocaleString()}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
                     {/* Cancellation Reason Box */}
                     <div className="p-3 rounded-xl bg-rose-50/80 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 text-xs space-y-1">
                       <div className="flex items-start gap-1.5 text-rose-900 dark:text-rose-200 font-bold">
                         <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5" />
                         <span>Reason: {app.cancellation_reason || 'Cancelled by clinic / patient'}</span>
                       </div>
-                      {app.cancelled_at && (
-                        <div className="text-[10px] text-rose-600 dark:text-rose-400 font-medium pl-5">
-                          Cancelled on: {new Date(app.cancelled_at).toLocaleString()}
-                        </div>
-                      )}
                       {app.notes && (
                         <div className="text-[11px] text-slate-600 dark:text-slate-300 pl-5 italic">
                           Notes: {app.notes}
