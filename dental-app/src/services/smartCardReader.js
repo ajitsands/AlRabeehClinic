@@ -38,38 +38,71 @@ class SmartCardReaderService {
   }
 
   // Connect to the local WebSocket service
-  connect(url) {
+  connect(url, timeoutMs = 3000) {
     if (url) this.wsUrl = url;
 
     return new Promise((resolve) => {
       try {
-        if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
           resolve(true);
           return;
         }
 
-        this.ws = new WebSocket(this.wsUrl);
+        if (this.ws) {
+          try { this.ws.close(); } catch (_) {}
+          this.ws = null;
+        }
 
-        this.ws.onopen = () => {
+        const targetUrl = url || this.wsUrl;
+        const socket = new WebSocket(targetUrl);
+        let settled = false;
+
+        const timer = setTimeout(() => {
+          if (!settled) {
+            settled = true;
+            try { socket.close(); } catch (_) {}
+            this.isConnected = false;
+            resolve(false);
+          }
+        }, timeoutMs);
+
+        socket.onopen = () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          this.ws = socket;
           this.isConnected = true;
-          this.emit('connectionChange', { status: 'CONNECTED', url: this.wsUrl });
+          this.wsUrl = targetUrl;
+          this.emit('connectionChange', { status: 'CONNECTED', url: targetUrl });
           this.getReadersList();
           resolve(true);
         };
 
-        this.ws.onmessage = (event) => {
+        socket.onmessage = (event) => {
           this.handleIncomingMessage(event.data);
         };
 
-        this.ws.onerror = (err) => {
-          this.isConnected = false;
-          this.emit('connectionChange', { status: 'ERROR', error: err });
-          resolve(false);
+        socket.onerror = (err) => {
+          if (!settled) {
+            settled = true;
+            clearTimeout(timer);
+            this.isConnected = false;
+            this.emit('connectionChange', { status: 'ERROR', error: err });
+            resolve(false);
+          }
         };
 
-        this.ws.onclose = () => {
-          this.isConnected = false;
-          this.emit('connectionChange', { status: 'DISCONNECTED' });
+        socket.onclose = () => {
+          if (this.ws === socket) {
+            this.isConnected = false;
+            this.ws = null;
+            this.emit('connectionChange', { status: 'DISCONNECTED' });
+          }
+          if (!settled) {
+            settled = true;
+            clearTimeout(timer);
+            resolve(false);
+          }
         };
       } catch (err) {
         this.isConnected = false;
@@ -77,6 +110,33 @@ class SmartCardReaderService {
         resolve(false);
       }
     });
+  }
+
+  // Ensure an active WebSocket connection to SCardReadWebApi (ports 5060, 5061, localhost / 127.0.0.1)
+  async ensureConnected() {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      return true;
+    }
+
+    const candidateUrls = [
+      this.wsUrl || 'ws://localhost:5060/SCardRead',
+      'ws://127.0.0.1:5060/SCardRead',
+      'ws://localhost:5060',
+      'ws://127.0.0.1:5060',
+      'wss://localhost:5061/SCardRead',
+      'wss://127.0.0.1:5061/SCardRead'
+    ];
+
+    for (const url of candidateUrls) {
+      try {
+        const ok = await this.connect(url, 1500);
+        if (ok) {
+          return true;
+        }
+      } catch (_) {}
+    }
+
+    return false;
   }
 
   disconnect() {
@@ -103,17 +163,19 @@ class SmartCardReaderService {
       }
 
       // Try parsing card reading payload
-      const json = JSON.parse(data);
+      const json = typeof data === 'string' ? JSON.parse(data) : data;
       const parsedPatient = this.parseCardPayload(json);
-      this.isReading = false;
-      this.emit('readSuccess', parsedPatient);
+      if (parsedPatient && (parsedPatient.cpr_number || parsedPatient.full_name_en)) {
+        this.isReading = false;
+        this.emit('readSuccess', parsedPatient);
+      }
     } catch (e) {
       // Raw string format or logging
       console.log('SmartCard Reader raw message:', data);
     }
   }
 
-  // Comprehensive connection testing across REST (Port 5050) and WebSocket (Port 5060)
+  // Comprehensive connection testing across REST (Port 5050) and WebSocket (Port 5060 / 5061)
   async testConnection(options = {}) {
     const wsUrl = options.wsUrl || this.wsUrl;
     const restUrl = options.restUrl || this.restUrl;
@@ -126,10 +188,10 @@ class SmartCardReaderService {
       error: null
     };
 
-    // 1. Test REST Service (Port 5050) - Primary & Most Reliable HTTP API in Bahrain CIO SDK
+    // 1. Test REST Service (Port 5050)
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
       const res = await fetch(restUrl, {
         method: 'POST',
         headers: {
@@ -163,7 +225,7 @@ class SmartCardReaderService {
         if (cpr || name) {
           results.hasCard = true;
           results.rest.message = `CPR Card detected & readable: ${name || cpr} (CPR: ${cpr || 'Active'})`;
-        } else if (data.ErrorDescription && (data.ErrorDescription.includes('removed') || data.ErrorDescription.includes('smart card'))) {
+        } else if (data.ErrorDescription && (data.ErrorDescription.includes('removed') || data.ErrorDescription.includes('smart card') || data.ErrorDescription.includes('no card'))) {
           results.rest.message = 'Service active & USB reader detected (Ready for card insertion)';
         } else {
           results.rest.message = data.ErrorDescription || 'REST service operational on port 5050';
@@ -176,11 +238,13 @@ class SmartCardReaderService {
       results.rest.message = e.name === 'AbortError' ? 'REST endpoint timed out' : (e.message || 'REST offline');
     }
 
-    // 2. Test WebSocket Service (Port 5060)
+    // 2. Test WebSocket Service (Port 5060 / 5061)
     try {
-      const wsConnected = await this.connect(wsUrl);
+      const wsConnected = await this.ensureConnected();
       results.ws.ok = wsConnected;
-      results.ws.message = wsConnected ? 'WebSocket active on port 5060' : 'WebSocket port 5060 not answering';
+      results.ws.message = wsConnected 
+        ? `WebSocket active & connected on ${this.wsUrl || 'port 5060'}` 
+        : 'WebSocket port 5060 not answering';
     } catch (e) {
       results.ws.ok = false;
       results.ws.message = e.message || 'WebSocket offline';
@@ -190,25 +254,25 @@ class SmartCardReaderService {
     
     if (results.overall) {
       this.isConnected = true;
-      this.emit('connectionChange', { status: 'CONNECTED', url: results.rest.ok ? restUrl : wsUrl });
+      this.emit('connectionChange', { status: 'CONNECTED', url: results.ws.ok ? this.wsUrl : restUrl });
       results.message = results.hasCard 
         ? `Smart Card Reader Connected! Card found: ${results.rest.message}`
-        : `Smart Card Service is ACTIVE & Running! (Port 5050 REST: Ready. Insert card to scan)`;
+        : `Smart Card Service (SCardReadWebApi) is ACTIVE & Connected! Insert patient's CPR card to scan.`;
     } else {
       this.isConnected = false;
       this.emit('connectionChange', { status: 'DISCONNECTED' });
-      results.message = 'Could not connect to SCardReadServer on localhost. If accessing via HTTPS, please allow Insecure Content in browser site settings.';
+      results.message = 'Could not connect to SCardReadWebApi on localhost:5060. Please ensure SCardReadWebApi is running and Insecure content is allowed in browser settings.';
     }
 
     return results;
   }
 
-  // Trigger Smart Card Read via REST API (primary) or WebSocket fallback
+  // Trigger Smart Card Read via REST API (primary) or WebSocket fallback (SCardReadWebApi)
   async readSmartCard(options = {}) {
     this.isReading = true;
     this.emit('readingStart');
 
-    // 1. First attempt direct REST API (Port 5050) as it is the most reliable
+    // 1. First attempt direct REST API (Port 5050)
     try {
       const restResult = await this.readViaRest(options);
       this.isReading = false;
@@ -218,63 +282,107 @@ class SmartCardReaderService {
       console.log('REST read attempt notice:', restErr.message);
 
       // If REST threw because no card was in the slot, propagate that specific error
-      if (restErr.message.includes('card has been removed') || restErr.message.includes('no card')) {
+      if (restErr.message && (restErr.message.includes('card has been removed') || restErr.message.includes('no card') || restErr.message.includes('No card'))) {
         this.isReading = false;
         this.emit('readError', restErr);
         throw new Error('Smart Card Reader is active, but no card was detected. Please insert the patient\'s CPR chip card firmly into the reader.');
       }
     }
 
-    // 2. Try via WebSocket if active
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      const payload = "ReadCard" + JSON.stringify({
-        ReadCardInfo: true,
-        ReadPersonalInfo: true,
-        ReadAddressDetails: true,
-        ReadBiometrics: true,
-        ReadEmploymentInfo: true,
-        ReadImmigrationDetails: true,
-        ReadTrafficDetails: false,
-        SilentReading: false,
-        ReaderIndex: -1,
-        ReaderName: options.readerName || "",
-        OutputFormat: "JSON",
-        ValidateCard: false
-      });
+    // 2. Try via WebSocket (SCardReadWebApi on Port 5060 / 5061)
+    try {
+      const isWsConnected = await this.ensureConnected();
+      if (isWsConnected && this.ws && this.ws.readyState === WebSocket.OPEN) {
+        const payload = "ReadCard" + JSON.stringify({
+          ReadCardInfo: true,
+          ReadPersonalInfo: true,
+          ReadAddressDetails: true,
+          ReadBiometrics: true,
+          ReadEmploymentInfo: true,
+          ReadImmigrationDetails: true,
+          ReadTrafficDetails: false,
+          SilentReading: false,
+          ReaderIndex: -1,
+          ReaderName: options.readerName || "",
+          OutputFormat: "JSON",
+          ValidateCard: false
+        });
 
-      this.ws.send(payload);
+        const cardData = await new Promise((resolve, reject) => {
+          let timer = null;
 
-      return new Promise((resolve, reject) => {
-        const cleanup = () => {
-          this.off('readSuccess', onReadSuccess);
-          this.off('readError', onReadError);
-          this.isReading = false;
-        };
+          const onMsg = (event) => {
+            try {
+              const rawData = event.data;
+              if (typeof rawData === 'string' && rawData.includes('ReaderNames') && !rawData.includes('MiscellaneousTextData')) {
+                return; // Ignore reader list notification
+              }
 
-        const onReadSuccess = (patientData) => {
-          cleanup();
-          resolve(patientData);
-        };
+              const json = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
+              const misc = json.MiscellaneousTextData || {};
+              const hasData = json.CPR || json.IdNumber || json.EnglishFirstName || json.EnglishFullName || misc.CPRNO || misc.FirstNameEnglish;
 
-        const onReadError = (err) => {
-          cleanup();
-          reject(err);
-        };
+              if (json.ErrorDescription && !hasData) {
+                cleanup();
+                if (json.ErrorDescription.includes('removed') || json.ErrorDescription.includes('no card') || json.ErrorDescription.includes('No card')) {
+                  reject(new Error('Smart Card Reader is connected, but no card was detected. Please insert CPR card into reader.'));
+                } else {
+                  reject(new Error(json.ErrorDescription));
+                }
+                return;
+              }
 
-        this.on('readSuccess', onReadSuccess);
-        this.on('readError', onReadError);
+              if (hasData) {
+                const parsed = this.parseCardPayload(json);
+                cleanup();
+                resolve(parsed);
+              }
+            } catch (parseErr) {
+              console.log('WebSocket message parse error:', parseErr);
+            }
+          };
 
-        setTimeout(() => {
-          cleanup();
-          reject(new Error('Card reading timed out. Please ensure CPR card is properly inserted in the reader.'));
-        }, 8000);
-      });
+          const onErr = (err) => {
+            cleanup();
+            reject(new Error('WebSocket connection error during card read.'));
+          };
+
+          const cleanup = () => {
+            if (timer) clearTimeout(timer);
+            if (this.ws) {
+              this.ws.removeEventListener('message', onMsg);
+              this.ws.removeEventListener('error', onErr);
+            }
+          };
+
+          this.ws.addEventListener('message', onMsg);
+          this.ws.addEventListener('error', onErr);
+
+          this.ws.send(payload);
+
+          timer = setTimeout(() => {
+            cleanup();
+            reject(new Error('Card reading timed out (10s). Please ensure the CPR card is inserted firmly and the reader LED is solid green.'));
+          }, 10000);
+        });
+
+        this.isReading = false;
+        this.emit('readSuccess', cardData);
+        return cardData;
+      }
+    } catch (wsErr) {
+      console.log('WebSocket read attempt notice:', wsErr.message);
+      if (wsErr.message && (wsErr.message.includes('card has been removed') || wsErr.message.includes('no card') || wsErr.message.includes('No card') || wsErr.message.includes('timed out') || wsErr.message.includes('inserted'))) {
+        this.isReading = false;
+        this.emit('readError', wsErr);
+        throw wsErr;
+      }
     }
 
     this.isReading = false;
     const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
-    const httpsHint = isHttps ? ' If accessing via HTTPS, please set "Insecure content" to "Allow" in Chrome/Edge Site Settings.' : '';
-    const err = new Error(`Smart Card Reader service not reachable or no card inserted.${httpsHint} Please ensure SCardReadServer.exe is running and the CPR card is inserted firmly.`);
+    const httpsHint = isHttps ? ' (If using HTTPS, ensure Insecure Content is allowed in Chrome settings and refresh)' : '';
+    const err = new Error(`Smart Card Reader service not reachable or no card inserted.${httpsHint} Please ensure SCardReadWebApi is running and the CPR card is inserted firmly.`);
     this.emit('readError', err);
     throw err;
   }
