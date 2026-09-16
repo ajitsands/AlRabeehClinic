@@ -137,7 +137,61 @@ function ensureSchemaUpToDate($db) {
             }
         } catch (Exception $e) {}
 
-        // 9. Convert all tables and columns to utf8mb4 to support Arabic text and CPR Smart Card addresses
+        // 9. Ensure patient_vitals and patient_attachments tables exist with full schema
+        $db->exec("CREATE TABLE IF NOT EXISTS `patient_vitals` (
+            `id` VARCHAR(50) PRIMARY KEY,
+            `patient_id` VARCHAR(50) NOT NULL,
+            `recorded_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            `bp_systolic` INT NULL,
+            `bp_diastolic` INT NULL,
+            `pulse_bpm` INT NULL,
+            `temperature_c` DECIMAL(4, 1) NULL,
+            `spo2_percent` INT NULL,
+            `blood_sugar_mg` INT NULL,
+            `weight_kg` DECIMAL(5, 1) NULL,
+            `pain_scale` INT NULL DEFAULT 0,
+            `clinical_notes` TEXT NULL,
+            `recorded_by_user_id` VARCHAR(50) NULL,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX `idx_patient_id` (`patient_id`)
+        ) ENGINE=InnoDB;");
+
+        $db->exec("CREATE TABLE IF NOT EXISTS `patient_attachments` (
+            `id` VARCHAR(50) PRIMARY KEY,
+            `patient_id` VARCHAR(50) NOT NULL,
+            `appointment_id` VARCHAR(50) NULL,
+            `file_name` VARCHAR(255) NOT NULL,
+            `original_name` VARCHAR(255) NOT NULL,
+            `category` VARCHAR(50) NOT NULL DEFAULT 'XRAY_OPG',
+            `file_size_bytes` BIGINT NOT NULL DEFAULT 0,
+            `mime_type` VARCHAR(100) NOT NULL DEFAULT 'application/octet-stream',
+            `file_path` VARCHAR(500) NULL,
+            `file_data_base64` LONGTEXT NULL,
+            `notes` TEXT NULL,
+            `uploaded_by_user_id` VARCHAR(50) NULL,
+            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX `idx_patient_id` (`patient_id`),
+            INDEX `idx_appointment_id` (`appointment_id`)
+        ) ENGINE=InnoDB;");
+
+        try {
+            $vitCols = $db->query("SHOW COLUMNS FROM `patient_vitals` LIKE 'updated_at'")->fetchAll();
+            if (empty($vitCols)) {
+                $db->exec("ALTER TABLE `patient_vitals` ADD COLUMN `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;");
+            }
+        } catch (Exception $e) {}
+
+        try {
+            $attCols = $db->query("SHOW COLUMNS FROM `patient_attachments` LIKE 'updated_at'")->fetchAll();
+            if (empty($attCols)) {
+                $db->exec("ALTER TABLE `patient_attachments` ADD COLUMN `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;");
+            }
+            $db->exec("ALTER TABLE `patient_attachments` MODIFY COLUMN `file_data_base64` LONGTEXT NULL;");
+        } catch (Exception $e) {}
+
+        // 10. Convert all tables and columns to utf8mb4 to support Arabic text and CPR Smart Card addresses
         try {
             $db->exec("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;");
             $db->exec("SET CHARACTER SET utf8mb4;");
@@ -149,7 +203,7 @@ function ensureSchemaUpToDate($db) {
                 $db->exec("ALTER TABLE `$tbl` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;");
             } catch (Exception $e) {}
         }
-        // 10. Ensure default branches in MySQL if empty
+        // 11. Ensure default branches in MySQL if empty
         $brCount = $db->query("SELECT COUNT(*) as cnt FROM `branches`")->fetch()['cnt'] ?? 0;
         if ($brCount == 0) {
             $db->exec("INSERT IGNORE INTO `branches` (`id`, `code`, `name`, `prefix`, `phone`, `address`, `color`, `country`, `currency_code`, `currency_symbol`, `currency_decimals`, `timezone`, `date_format`, `is_active`) VALUES
@@ -159,7 +213,7 @@ function ensureSchemaUpToDate($db) {
             ('branch-muh', 'MUH', 'Muharraq Family Dental', 'ARB-MUH', '+973 1734 1122', 'Road 2104, Block 221, Muharraq, Bahrain', '#D97706', 'Bahrain', 'BHD', 'BD', 3, 'Asia\/Bahrain', 'DD\/MM\/YYYY', 1);");
         }
 
-        // 11. Ensure default dental services in MySQL if empty
+        // 12. Ensure default dental services in MySQL if empty
         $srvCount = $db->query("SELECT COUNT(*) as cnt FROM `dental_services`")->fetch()['cnt'] ?? 0;
         if ($srvCount == 0) {
             $db->exec("INSERT IGNORE INTO `dental_services` (`id`, `name`, `category`, `price`, `default_duration_mins`, `required_slots`, `description`, `is_active`) VALUES
@@ -347,20 +401,34 @@ if ($method === 'POST' && $action === 'push') {
             } elseif ($entityType === 'vitals') {
                 if ($operation === 'INSERT' || $operation === 'UPDATE') {
                     $stmt = $db->prepare("
-                        INSERT INTO patient_vitals (id, patient_id, bp_systolic, bp_diastolic, pulse_bpm, temperature_c, spo2_percent, blood_sugar_mg, weight_kg, pain_scale, clinical_notes)
-                        VALUES (:id, :patient_id, :bp_systolic, :bp_diastolic, :pulse_bpm, :temperature_c, :spo2_percent, :blood_sugar_mg, :weight_kg, :pain_scale, :clinical_notes)
+                        INSERT INTO patient_vitals (id, patient_id, recorded_at, bp_systolic, bp_diastolic, pulse_bpm, temperature_c, spo2_percent, blood_sugar_mg, weight_kg, pain_scale, clinical_notes, updated_at)
+                        VALUES (:id, :patient_id, :recorded_at, :bp_systolic, :bp_diastolic, :pulse_bpm, :temperature_c, :spo2_percent, :blood_sugar_mg, :weight_kg, :pain_scale, :clinical_notes, NOW())
+                        ON DUPLICATE KEY UPDATE
+                            patient_id = VALUES(patient_id),
+                            recorded_at = VALUES(recorded_at),
+                            bp_systolic = VALUES(bp_systolic),
+                            bp_diastolic = VALUES(bp_diastolic),
+                            pulse_bpm = VALUES(pulse_bpm),
+                            temperature_c = VALUES(temperature_c),
+                            spo2_percent = VALUES(spo2_percent),
+                            blood_sugar_mg = VALUES(blood_sugar_mg),
+                            weight_kg = VALUES(weight_kg),
+                            pain_scale = VALUES(pain_scale),
+                            clinical_notes = VALUES(clinical_notes),
+                            updated_at = NOW()
                     ");
                     $stmt->execute([
                         ':id' => $payload['id'],
                         ':patient_id' => $payload['patient_id'],
-                        ':bp_systolic' => $payload['bp_systolic'] ?? null,
-                        ':bp_diastolic' => $payload['bp_diastolic'] ?? null,
-                        ':pulse_bpm' => $payload['pulse_bpm'] ?? null,
-                        ':temperature_c' => $payload['temperature_c'] ?? null,
-                        ':spo2_percent' => $payload['spo2_percent'] ?? null,
-                        ':blood_sugar_mg' => $payload['blood_sugar_mg'] ?? null,
-                        ':weight_kg' => $payload['weight_kg'] ?? null,
-                        ':pain_scale' => $payload['pain_scale'] ?? 0,
+                        ':recorded_at' => !empty($payload['recorded_at']) ? date('Y-m-d H:i:s', strtotime($payload['recorded_at'])) : date('Y-m-d H:i:s'),
+                        ':bp_systolic' => isset($payload['bp_systolic']) && $payload['bp_systolic'] !== '' ? intval($payload['bp_systolic']) : null,
+                        ':bp_diastolic' => isset($payload['bp_diastolic']) && $payload['bp_diastolic'] !== '' ? intval($payload['bp_diastolic']) : null,
+                        ':pulse_bpm' => isset($payload['pulse_bpm']) && $payload['pulse_bpm'] !== '' ? intval($payload['pulse_bpm']) : null,
+                        ':temperature_c' => isset($payload['temperature_c']) && $payload['temperature_c'] !== '' ? floatval($payload['temperature_c']) : null,
+                        ':spo2_percent' => isset($payload['spo2_percent']) && $payload['spo2_percent'] !== '' ? intval($payload['spo2_percent']) : null,
+                        ':blood_sugar_mg' => isset($payload['blood_sugar_mg']) && $payload['blood_sugar_mg'] !== '' ? intval($payload['blood_sugar_mg']) : null,
+                        ':weight_kg' => isset($payload['weight_kg']) && $payload['weight_kg'] !== '' ? floatval($payload['weight_kg']) : null,
+                        ':pain_scale' => isset($payload['pain_scale']) ? intval($payload['pain_scale']) : 0,
                         ':clinical_notes' => $payload['clinical_notes'] ?? null
                     ]);
                 } elseif ($operation === 'DELETE') {
@@ -370,17 +438,29 @@ if ($method === 'POST' && $action === 'push') {
             } elseif ($entityType === 'attachments') {
                 if ($operation === 'INSERT' || $operation === 'UPDATE') {
                     $stmt = $db->prepare("
-                        INSERT INTO patient_attachments (id, patient_id, appointment_id, file_name, original_name, category, file_size_bytes, mime_type, file_path, file_data_base64, notes)
-                        VALUES (:id, :patient_id, :appointment_id, :file_name, :original_name, :category, :file_size_bytes, :mime_type, :file_path, :file_data_base64, :notes)
+                        INSERT INTO patient_attachments (id, patient_id, appointment_id, file_name, original_name, category, file_size_bytes, mime_type, file_path, file_data_base64, notes, updated_at)
+                        VALUES (:id, :patient_id, :appointment_id, :file_name, :original_name, :category, :file_size_bytes, :mime_type, :file_path, :file_data_base64, :notes, NOW())
+                        ON DUPLICATE KEY UPDATE
+                            patient_id = VALUES(patient_id),
+                            appointment_id = VALUES(appointment_id),
+                            file_name = VALUES(file_name),
+                            original_name = VALUES(original_name),
+                            category = VALUES(category),
+                            file_size_bytes = VALUES(file_size_bytes),
+                            mime_type = VALUES(mime_type),
+                            file_path = VALUES(file_path),
+                            file_data_base64 = VALUES(file_data_base64),
+                            notes = VALUES(notes),
+                            updated_at = NOW()
                     ");
                     $stmt->execute([
                         ':id' => $payload['id'],
                         ':patient_id' => $payload['patient_id'],
-                        ':appointment_id' => $payload['appointment_id'] ?? null,
+                        ':appointment_id' => !empty($payload['appointment_id']) ? $payload['appointment_id'] : null,
                         ':file_name' => $payload['file_name'],
-                        ':original_name' => $payload['original_name'],
+                        ':original_name' => $payload['original_name'] ?? $payload['file_name'],
                         ':category' => $payload['category'] ?? 'XRAY_OPG',
-                        ':file_size_bytes' => $payload['file_size_bytes'] ?? 0,
+                        ':file_size_bytes' => isset($payload['file_size_bytes']) ? intval($payload['file_size_bytes']) : 0,
                         ':mime_type' => $payload['mime_type'] ?? 'application/octet-stream',
                         ':file_path' => $payload['file_path'] ?? '',
                         ':file_data_base64' => $payload['file_data_base64'] ?? null,
@@ -562,6 +642,24 @@ if ($method === 'GET' && $action === 'pull') {
     $doctors = $db->query("SELECT * FROM doctors WHERE updated_at >= '$since'")->fetchAll();
     $services = $db->query("SELECT * FROM dental_services WHERE updated_at >= '$since'")->fetchAll();
 
+    $vitals = [];
+    try {
+        $vitals = $db->query("SELECT * FROM patient_vitals WHERE (updated_at >= '$since' OR created_at >= '$since')")->fetchAll();
+    } catch (Exception $e) {
+        try {
+            $vitals = $db->query("SELECT * FROM patient_vitals")->fetchAll();
+        } catch (Exception $e2) {}
+    }
+
+    $attachments = [];
+    try {
+        $attachments = $db->query("SELECT * FROM patient_attachments WHERE (updated_at >= '$since' OR created_at >= '$since')")->fetchAll();
+    } catch (Exception $e) {
+        try {
+            $attachments = $db->query("SELECT * FROM patient_attachments")->fetchAll();
+        } catch (Exception $e2) {}
+    }
+
     echo json_encode([
         'success' => true,
         'serverTime' => date('Y-m-d H:i:s'),
@@ -571,7 +669,9 @@ if ($method === 'GET' && $action === 'pull') {
             'patients' => $patients,
             'appointments' => $appointments,
             'doctors' => $doctors,
-            'services' => $services
+            'services' => $services,
+            'vitals' => $vitals,
+            'attachments' => $attachments
         ]
     ]);
     exit();

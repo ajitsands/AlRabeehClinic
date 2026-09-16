@@ -189,7 +189,7 @@ class SyncEngine {
         throw new Error('Invalid pull response structure from server');
       }
 
-      const { branches, users, patients, appointments, doctors, services } = resJson.data;
+      const { branches, users, patients, appointments, doctors, services, vitals, attachments } = resJson.data;
       let pulledCount = 0;
 
       // 1. Ingest Branches
@@ -341,6 +341,53 @@ class SyncEngine {
             updated_at: a.updated_at
           };
           await db.appointments.put(item);
+          pulledCount++;
+        }
+      }
+
+      // 7. Ingest Vitals
+      if (Array.isArray(vitals) && vitals.length > 0) {
+        for (const v of vitals) {
+          const item = {
+            id: v.id,
+            patient_id: v.patient_id,
+            recorded_at: v.recorded_at || v.created_at || new Date().toISOString(),
+            bp_systolic: v.bp_systolic !== null && v.bp_systolic !== undefined ? Number(v.bp_systolic) : null,
+            bp_diastolic: v.bp_diastolic !== null && v.bp_diastolic !== undefined ? Number(v.bp_diastolic) : null,
+            pulse_bpm: v.pulse_bpm !== null && v.pulse_bpm !== undefined ? Number(v.pulse_bpm) : null,
+            temperature_c: v.temperature_c !== null && v.temperature_c !== undefined ? Number(v.temperature_c) : null,
+            spo2_percent: v.spo2_percent !== null && v.spo2_percent !== undefined ? Number(v.spo2_percent) : null,
+            blood_sugar_mg: v.blood_sugar_mg !== null && v.blood_sugar_mg !== undefined ? Number(v.blood_sugar_mg) : null,
+            weight_kg: v.weight_kg !== null && v.weight_kg !== undefined ? Number(v.weight_kg) : null,
+            pain_scale: Number(v.pain_scale || 0),
+            clinical_notes: v.clinical_notes || '',
+            created_at: v.created_at || new Date().toISOString(),
+            updated_at: v.updated_at || v.created_at || new Date().toISOString()
+          };
+          await db.vitals.put(item);
+          pulledCount++;
+        }
+      }
+
+      // 8. Ingest Attachments & Clinical X-Rays
+      if (Array.isArray(attachments) && attachments.length > 0) {
+        for (const att of attachments) {
+          const item = {
+            id: att.id,
+            patient_id: att.patient_id,
+            appointment_id: att.appointment_id || null,
+            file_name: att.file_name,
+            original_name: att.original_name || att.file_name,
+            category: att.category || 'XRAY_OPG',
+            file_size_bytes: Number(att.file_size_bytes || 0),
+            mime_type: att.mime_type || 'application/octet-stream',
+            file_path: att.file_path || '',
+            file_data_base64: att.file_data_base64 || null,
+            notes: att.notes || '',
+            created_at: att.created_at || new Date().toISOString(),
+            updated_at: att.updated_at || att.created_at || new Date().toISOString()
+          };
+          await db.attachments.put(item);
           pulledCount++;
         }
       }

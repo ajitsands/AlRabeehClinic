@@ -460,6 +460,19 @@ export default function VitalsAndAttachmentsManager({ activePatientId, onBackToL
     }
   }, [activePatientId]);
 
+  useEffect(() => {
+    const unsubPull = syncEngine.on('pullSuccess', () => {
+      loadData();
+    });
+    const unsubSync = syncEngine.on('syncSuccess', () => {
+      loadData();
+    });
+    return () => {
+      unsubPull();
+      unsubSync();
+    };
+  }, [selectedPatientId]);
+
   // Save Vitals
   const handleSaveVitals = async (e) => {
     e.preventDefault();
