@@ -817,8 +817,8 @@ class SmartCardReaderService {
     }
 
     // Photo Base64
-    let photoBase64 = this.findFieldValue(raw, 'PhotoB64Encoded', 'Photo', 'CardHolderPhoto', 'BiometricPhoto')
-      || this.findFieldValue(misc, 'PhotoB64Encoded', 'Photo', 'CardHolderPhoto')
+    let photoBase64 = this.findFieldValue(raw, 'PhotoB64Encoded', 'Photo', 'CardPhoto', 'CPRPhoto', 'CardHolderPhoto', 'BiometricPhoto')
+      || this.findFieldValue(misc, 'PhotoB64Encoded', 'Photo', 'CardPhoto', 'CPRPhoto', 'CardHolderPhoto')
       || null;
     if (photoBase64 && !photoBase64.startsWith('data:image')) {
       photoBase64 = `data:image/jpeg;base64,${photoBase64}`;

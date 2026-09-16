@@ -403,6 +403,8 @@ namespace AlRabeesh.SmartCard
                     sb.Append("\"BlockNameEnglish\":\"").Append(EscapeJson(blockName)).Append("\",");
                     sb.Append("\"CardPhoto\":\"").Append(photoBase64).Append("\",");
                     sb.Append("\"CPRPhoto\":\"").Append(photoBase64).Append("\",");
+                    sb.Append("\"PhotoB64Encoded\":\"").Append(photoBase64).Append("\",");
+                    sb.Append("\"Photo\":\"").Append(photoBase64).Append("\",");
                     sb.Append("\"ErrorDescription\":null,");
                     sb.Append("\"MiscellaneousTextData\":{");
                     sb.Append("\"CPRNO\":\"").Append(EscapeJson(cpr)).Append("\",");
