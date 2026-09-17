@@ -749,11 +749,16 @@ export default function PatientListAndRegistration({ isRegisterModalOpen, setIsR
                       : 'text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/70 border-dashed border-blue-300 dark:border-blue-700'
                   }`}>
                     <FileText className="w-4 h-4 shrink-0" />
-                    <span>
-                      {duplicateCprPatient 
-                        ? `${duplicateCprPatient.file_number} (Registered Record)`
-                        : `${(branches.find(b => b.id === formHomeBranchId) || activeBranch)?.prefix || 'ARB-MNM'} • Auto-Generated on Save`}
-                    </span>
+                    {duplicateCprPatient ? (
+                      <div className="flex flex-col text-left">
+                        <span className="font-extrabold leading-tight whitespace-nowrap">{duplicateCprPatient.file_number}</span>
+                        <span className="text-[10px] font-bold opacity-85 leading-tight whitespace-nowrap">(Registered Record)</span>
+                      </div>
+                    ) : (
+                      <span>
+                        {`${(branches.find(b => b.id === formHomeBranchId) || activeBranch)?.prefix || 'ARB-MNM'} • Auto-Generated on Save`}
+                      </span>
+                    )}
                   </div>
                 </div>
 
