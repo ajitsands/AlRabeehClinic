@@ -118,8 +118,8 @@ export default function SyncCenterModal({ isOpen, onClose }) {
       const result = await syncNow();
       if (result?.success) {
         setSyncStatusMsg({ 
-          type: 'success', 
-          text: result.message || `Successfully synced ${result.count || 0} records.` 
+          type: result.hasChanges ? 'success' : 'info', 
+          text: result.hasChanges ? (result.message || `Successfully synced ${result.count || 0} records.`) : 'All records are up to date with server (No new changes).' 
         });
         await loadPendingList();
       } else {

@@ -194,6 +194,8 @@ class SyncEngine {
 
       // 1. Ingest Branches
       if (Array.isArray(branches) && branches.length > 0) {
+        const localBranches = await db.branches.toArray();
+        const localMap = new Map(localBranches.map(b => [b.id, b]));
         for (const b of branches) {
           const item = {
             id: b.id,
@@ -213,13 +215,19 @@ class SyncEngine {
             created_at: b.created_at,
             updated_at: b.updated_at
           };
-          await db.branches.put(item);
-          pulledCount++;
+          const existing = localMap.get(item.id);
+          const isChanged = !existing || existing.updated_at !== item.updated_at;
+          if (isChanged) {
+            await db.branches.put(item);
+            pulledCount++;
+          }
         }
       }
 
       // 2. Ingest Users
       if (Array.isArray(users) && users.length > 0) {
+        const localUsers = await db.users.toArray();
+        const localMap = new Map(localUsers.map(u => [u.id, u]));
         for (const u of users) {
           const item = {
             id: u.id,
@@ -233,13 +241,19 @@ class SyncEngine {
             created_at: u.created_at,
             updated_at: u.updated_at
           };
-          await db.users.put(item);
-          pulledCount++;
+          const existing = localMap.get(item.id);
+          const isChanged = !existing || existing.updated_at !== item.updated_at;
+          if (isChanged) {
+            await db.users.put(item);
+            pulledCount++;
+          }
         }
       }
 
       // 3. Ingest Doctors
       if (Array.isArray(doctors) && doctors.length > 0) {
+        const localDocs = await db.doctors.toArray();
+        const localMap = new Map(localDocs.map(d => [d.id, d]));
         for (const d of doctors) {
           const item = {
             id: d.id,
@@ -260,13 +274,19 @@ class SyncEngine {
             created_at: d.created_at,
             updated_at: d.updated_at
           };
-          await db.doctors.put(item);
-          pulledCount++;
+          const existing = localMap.get(item.id);
+          const isChanged = !existing || existing.updated_at !== item.updated_at;
+          if (isChanged) {
+            await db.doctors.put(item);
+            pulledCount++;
+          }
         }
       }
 
       // 4. Ingest Services
       if (Array.isArray(services) && services.length > 0) {
+        const localServices = await db.services.toArray();
+        const localMap = new Map(localServices.map(s => [s.id, s]));
         for (const s of services) {
           const item = {
             id: s.id,
@@ -280,13 +300,19 @@ class SyncEngine {
             created_at: s.created_at,
             updated_at: s.updated_at
           };
-          await db.services.put(item);
-          pulledCount++;
+          const existing = localMap.get(item.id);
+          const isChanged = !existing || existing.updated_at !== item.updated_at;
+          if (isChanged) {
+            await db.services.put(item);
+            pulledCount++;
+          }
         }
       }
 
       // 5. Ingest Patients
       if (Array.isArray(patients) && patients.length > 0) {
+        const localPatients = await db.patients.toArray();
+        const localMap = new Map(localPatients.map(p => [p.id, p]));
         for (const p of patients) {
           const item = {
             id: p.id,
@@ -314,13 +340,19 @@ class SyncEngine {
             created_at: p.created_at,
             updated_at: p.updated_at
           };
-          await db.patients.put(item);
-          pulledCount++;
+          const existing = localMap.get(item.id);
+          const isChanged = !existing || existing.updated_at !== item.updated_at;
+          if (isChanged) {
+            await db.patients.put(item);
+            pulledCount++;
+          }
         }
       }
 
       // 6. Ingest Appointments
       if (Array.isArray(appointments) && appointments.length > 0) {
+        const localAppts = await db.appointments.toArray();
+        const localMap = new Map(localAppts.map(a => [a.id, a]));
         for (const a of appointments) {
           const item = {
             id: a.id,
@@ -340,13 +372,19 @@ class SyncEngine {
             created_at: a.created_at,
             updated_at: a.updated_at
           };
-          await db.appointments.put(item);
-          pulledCount++;
+          const existing = localMap.get(item.id);
+          const isChanged = !existing || existing.updated_at !== item.updated_at;
+          if (isChanged) {
+            await db.appointments.put(item);
+            pulledCount++;
+          }
         }
       }
 
       // 7. Ingest Vitals
       if (Array.isArray(vitals) && vitals.length > 0) {
+        const localVitals = await db.vitals.toArray();
+        const localMap = new Map(localVitals.map(v => [v.id, v]));
         for (const v of vitals) {
           const item = {
             id: v.id,
@@ -364,13 +402,19 @@ class SyncEngine {
             created_at: v.created_at || new Date().toISOString(),
             updated_at: v.updated_at || v.created_at || new Date().toISOString()
           };
-          await db.vitals.put(item);
-          pulledCount++;
+          const existing = localMap.get(item.id);
+          const isChanged = !existing || existing.updated_at !== item.updated_at;
+          if (isChanged) {
+            await db.vitals.put(item);
+            pulledCount++;
+          }
         }
       }
 
       // 8. Ingest Attachments & Clinical X-Rays
       if (Array.isArray(attachments) && attachments.length > 0) {
+        const localAtts = await db.attachments.toArray();
+        const localMap = new Map(localAtts.map(a => [a.id, a]));
         for (const att of attachments) {
           const item = {
             id: att.id,
@@ -387,8 +431,12 @@ class SyncEngine {
             created_at: att.created_at || new Date().toISOString(),
             updated_at: att.updated_at || att.created_at || new Date().toISOString()
           };
-          await db.attachments.put(item);
-          pulledCount++;
+          const existing = localMap.get(item.id);
+          const isChanged = !existing || existing.updated_at !== item.updated_at;
+          if (isChanged) {
+            await db.attachments.put(item);
+            pulledCount++;
+          }
         }
       }
 
@@ -619,18 +667,35 @@ class SyncEngine {
       const remainingCount = await this.getPendingCount();
       this.emit('outboxUpdated', remainingCount);
 
+      const pulledCount = pullResult.count || 0;
+      const hasChanges = totalSynced > 0 || pulledCount > 0;
+      let syncMsg = '';
+
+      if (totalSynced > 0 && pulledCount > 0) {
+        syncMsg = `Sync complete: Uploaded ${totalSynced} changes, Downloaded ${pulledCount} records from server.`;
+      } else if (totalSynced > 0) {
+        syncMsg = `Sync complete: Uploaded ${totalSynced} ${totalSynced === 1 ? 'change' : 'changes'} to server.`;
+      } else if (pulledCount > 0) {
+        syncMsg = `Sync complete: Downloaded ${pulledCount} ${pulledCount === 1 ? 'record' : 'records'} from server.`;
+      } else {
+        syncMsg = 'Synchronized (All records up to date)';
+      }
+
       this.emit('syncSuccess', {
         lastSync: this.lastSyncTime,
         pendingCount: remainingCount,
         syncedCount: totalSynced,
-        pulledCount: pullResult.count || 0,
-        message: `Sync complete: Uploaded ${totalSynced} changes, Downloaded ${pullResult.count || 0} records from server.`
+        pulledCount: pulledCount,
+        hasChanges,
+        message: syncMsg
       });
 
       return {
         success: true,
         count: totalSynced,
-        pulled: pullResult.count || 0,
+        pulled: pulledCount,
+        hasChanges,
+        message: syncMsg,
         remaining: remainingCount,
         errors: errors.length > 0 ? errors : undefined
       };

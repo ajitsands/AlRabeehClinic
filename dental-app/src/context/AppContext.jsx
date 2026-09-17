@@ -548,11 +548,11 @@ export function AppProvider({ children }) {
     });
 
     const unsubSyncStart = syncEngine.on('syncStart', () => setIsSyncing(true));
-    const unsubSyncSuccess = syncEngine.on('syncSuccess', ({ pendingCount, syncedCount, message }) => {
+    const unsubSyncSuccess = syncEngine.on('syncSuccess', ({ pendingCount, syncedCount, pulledCount, hasChanges, message }) => {
       setIsSyncing(false);
       setPendingSyncCount(pendingCount);
-      if (syncedCount > 0) {
-        showToast(message || `Synchronized ${syncedCount} records with cloud server`, 'success');
+      if (hasChanges && ((syncedCount || 0) > 0 || (pulledCount || 0) > 0)) {
+        showToast(message, 'success');
       }
     });
     const unsubSyncError = syncEngine.on('syncError', ({ error, pendingCount }) => {
