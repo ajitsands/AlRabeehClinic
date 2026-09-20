@@ -3,13 +3,15 @@
     RewriteEngine On
     RewriteBase /
 
-    # Allow direct access to existing backend API and SDK files
+    # Allow direct access to existing backend API, downloads, and SDK files
     RewriteCond %{REQUEST_URI} ^/backend/ [NC,OR]
+    RewriteCond %{REQUEST_URI} ^/downloads/ [NC,OR]
     RewriteCond %{REQUEST_URI} ^/ReaderSDK/ [NC]
     RewriteRule ^ - [L]
 
     # Map static assets to dental-app/dist/
     RewriteRule ^assets/(.*)$ dental-app/dist/assets/$1 [L]
+    RewriteRule ^downloads/(.*)$ dental-app/dist/downloads/$1 [L]
     RewriteRule ^favicon\.svg$ dental-app/dist/favicon.svg [L]
     RewriteRule ^icons\.svg$ dental-app/dist/icons.svg [L]
 

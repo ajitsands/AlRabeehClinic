@@ -26,10 +26,4 @@ Thumbs.db
 # Development support documentation folder
 DevelopSupportFilesFolder/
 
-# Static download executables cache
-dental-app/public/downloads/
-dental-app/dist/downloads/
-**/downloads/
-
-
 
