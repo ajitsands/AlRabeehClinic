@@ -457,31 +457,67 @@ namespace AlRabeesh.SmartCard
 <head>
     <meta charset=""UTF-8"">
     <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"">
-    <title>Al Rabeesh Dental - Bahrain Smart Card Bridge</title>
+    <title>Al Rabeesh Dental — Bahrain Smart Card Bridge</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 24px; }
-        .container { max-width: 800px; margin: 0 auto; background: #1e293b; border-radius: 12px; padding: 28px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid #334155; }
-        h1 { color: #38bdf8; margin-top: 0; display: flex; align-items: center; gap: 10px; font-size: 24px; }
+        .container { max-width: 820px; margin: 0 auto; background: #1e293b; border-radius: 16px; padding: 28px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid #334155; }
+        .header-top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; margin-bottom: 16px; }
+        .logo-box { background: #ffffff; padding: 6px 14px; border-radius: 12px; display: inline-flex; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.25); cursor: pointer; transition: transform 0.2s; }
+        .logo-box:hover { transform: translateY(-1px); }
+        .logo-box img { height: 38px; object-fit: contain; }
+        h1 { color: #38bdf8; margin: 0; display: flex; align-items: center; gap: 10px; font-size: 22px; font-weight: 800; }
         .badge { display: inline-block; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: bold; }
         .badge-green { background: #059669; color: #ecfdf5; }
         .badge-yellow { background: #d97706; color: #fffbeb; }
         .badge-red { background: #dc2626; color: #fef2f2; }
         .status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0; }
-        .card { background: #0f172a; padding: 16px; border-radius: 8px; border: 1px solid #334155; }
-        .card-label { font-size: 12px; color: #94a3b8; text-transform: uppercase; font-weight: bold; margin-bottom: 4px; }
-        .card-val { font-size: 16px; font-weight: 600; color: #f1f5f9; word-break: break-all; }
-        button { background: linear-gradient(135deg, #0284c7, #0369a1); color: white; border: none; padding: 12px 24px; font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
-        button:hover { background: linear-gradient(135deg, #0369a1, #075985); }
-        button:disabled { opacity: 0.6; cursor: not-allowed; }
-        #output { margin-top: 20px; background: #020617; border-radius: 8px; padding: 16px; border: 1px solid #1e293b; font-family: monospace; font-size: 13px; max-height: 350px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; }
-        .note { font-size: 13px; color: #94a3b8; margin-top: 16px; line-height: 1.5; }
+        .card { background: #0f172a; padding: 16px; border-radius: 10px; border: 1px solid #334155; }
+        .card-label { font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: bold; margin-bottom: 4px; letter-spacing: 0.5px; }
+        .card-val { font-size: 15px; font-weight: 600; color: #f1f5f9; word-break: break-all; }
+        button.btn-primary { background: linear-gradient(135deg, #0284c7, #0369a1); color: white; border: none; padding: 12px 24px; font-size: 15px; font-weight: bold; border-radius: 10px; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 6px -1px rgba(2, 132, 199, 0.3); }
+        button.btn-primary:hover { background: linear-gradient(135deg, #0369a1, #075985); }
+        button.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+        #output { margin-top: 20px; background: #020617; border-radius: 10px; padding: 16px; border: 1px solid #1e293b; font-family: Consolas, Monaco, monospace; font-size: 13px; max-height: 320px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; color: #38bdf8; }
+        .note { font-size: 13px; color: #94a3b8; margin-top: 16px; line-height: 1.5; background: #0f172a; padding: 14px; border-radius: 10px; border-left: 4px solid #38bdf8; }
         .note strong { color: #38bdf8; }
+        
+        /* Footer matching Application */
+        .footer { margin-top: 28px; padding-top: 18px; border-top: 1px solid #334155; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; font-size: 12px; color: #94a3b8; }
+        .btn-sands { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 9999px; background: #0f172a; border: 1px solid #334155; color: #e2e8f0; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; text-decoration: none; }
+        .btn-sands:hover { background: #1e1b4b; border-color: #818cf8; transform: translateY(-1px); }
+        .grad-sands { background: linear-gradient(135deg, #c026d3, #9333ea, #6366f1); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 800; }
+
+        /* Sands Modal */
+        .modal-overlay { position: fixed; inset: 0; z-index: 9999; display: none; align-items: center; justify-content: center; padding: 16px; background: rgba(2, 6, 23, 0.8); backdrop-filter: blur(6px); }
+        .modal-overlay.active { display: flex; }
+        .modal-card { width: 100%; max-width: 480px; background: #1e293b; color: #f8fafc; border-radius: 20px; box-shadow: 0 25px 50px rgba(0,0,0,0.5); border: 1px solid #334155; overflow: hidden; position: relative; }
+        .modal-close { position: absolute; top: 12px; right: 12px; width: 30px; height: 30px; border-radius: 50%; background: rgba(0,0,0,0.3); border: none; color: white; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 20; }
+        .modal-head { padding: 24px 20px; background: linear-gradient(135deg, #c026d3 0%, #9333ea 50%, #4f46e5 100%); text-align: center; }
+        .modal-head h3 { font-size: 19px; font-weight: 800; margin: 8px 0 2px; }
+        .modal-head p { font-size: 12px; color: #f3e8ff; margin: 0; }
+        .modal-body { padding: 20px; font-size: 13px; line-height: 1.6; }
+        .modal-info-box { background: #0f172a; border-radius: 12px; padding: 14px; margin: 14px 0; border: 1px solid #334155; display: flex; flex-direction: column; gap: 8px; }
+        .info-item { display: flex; gap: 6px; flex-wrap: wrap; }
+        .info-item a { color: #38bdf8; text-decoration: none; font-weight: 600; }
+        .modal-acts { display: flex; gap: 8px; margin-top: 16px; }
+        .btn-wa { flex: 1; padding: 9px 12px; background: #10b981; color: white; border-radius: 10px; font-weight: bold; text-decoration: none; text-align: center; font-size: 12px; }
+        .btn-prod { flex: 1; padding: 9px 12px; background: #0f172a; color: #38bdf8; border: 1px solid #38bdf8; border-radius: 10px; font-weight: bold; text-decoration: none; text-align: center; font-size: 12px; }
     </style>
 </head>
 <body>
     <div class=""container"">
+        <div class=""header-top"">
+            <!-- SaNDS Lab White Container Logo -->
+            <div class=""logo-box"" onclick=""openSandsModal()"" title=""Engineered by SaNDS Lab"">
+                <img src=""https://qrgenerator.sandslab.com/assets/SaNDSLab-LogoForWhite-C43CoLgA.png"" alt=""SaNDS Lab"" onerror=""this.style.display='none'"" />
+            </div>
+            <div style=""font-size: 12px; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; background: #0f172a; padding: 6px 12px; border-radius: 8px; border: 1px solid #334155;"">
+                Port 5050 &bull; REST API
+            </div>
+        </div>
+
         <h1>🏥 Al Rabeesh Dental — Bahrain Smart Card Bridge</h1>
-        <p style=""color: #94a3b8; margin-top: -6px;"">Official CIO CPR Card Reader Service Bridge (Port 5050)</p>
+        <p style=""color: #94a3b8; margin-top: 4px; font-size: 13px;"">Official CIO CPR Card Reader Service Bridge</p>
 
         <div class=""status-grid"">
             <div class=""card"">
@@ -503,17 +539,60 @@ namespace AlRabeesh.SmartCard
         </div>
 
         <div style=""display: flex; gap: 12px; align-items: center;"">
-            <button id=""btnRead"" onclick=""testReadCard()"">💳 Read CPR Smart Card Now</button>
-            <button onclick=""location.reload()"" style=""background: #334155;"">🔄 Refresh Status</button>
+            <button id=""btnRead"" class=""btn-primary"" onclick=""testReadCard()"">💳 Read CPR Smart Card Now</button>
+            <button onclick=""location.reload()"" style=""background: #334155; color: white; border: none; padding: 12px 18px; font-size: 14px; font-weight: bold; border-radius: 10px; cursor: pointer;"">🔄 Refresh Status</button>
         </div>
 
         <div id=""output"">Click 'Read CPR Smart Card Now' to test live card reading...</div>
 
         <div class=""note"">
             <strong>How to use with CPR Card:</strong><br>
-            1. Insert CPR Card firmly into USB reader (Chip facing UP/DOWN depending on reader model).<br>
+            1. Insert CPR Card firmly into USB reader (Chip facing UP for old cards, or DOWN for 2025/2026 back-chip cards).<br>
             2. Click the button above to verify CPR Number, Name, Address, and Date of Birth.<br>
-            3. In Al Rabeesh Dental App or RESTfull.html, click 'Read Smart Card' — it will read instantly!
+            3. In Al Rabeesh Dental App, click 'Read CPR' — it reads automatically via Port 5050!
+        </div>
+
+        <!-- Footer Matching Application -->
+        <footer class=""footer"">
+            <div>
+                <span>Al Rabeesh Dental Software &bull; Bahrain Smart Card Active</span>
+            </div>
+            <div>
+                <button type=""button"" class=""btn-sands"" onclick=""openSandsModal()"">
+                    <span>✨ Engineered By</span>
+                    <span class=""grad-sands"">SaNDS Lab</span>
+                </button>
+            </div>
+        </footer>
+    </div>
+
+    <!-- SaNDS Lab Modal Popup (Matching Application) -->
+    <div id=""sandsModal"" class=""modal-overlay"" onclick=""closeSandsModal(event)"">
+        <div class=""modal-card"" onclick=""event.stopPropagation()"">
+            <button class=""modal-close"" onclick=""closeSandsModal()"">&times;</button>
+            <div class=""modal-head"">
+                <div class=""logo-box"" style=""display: inline-flex; margin-bottom: 6px;"">
+                    <img src=""https://qrgenerator.sandslab.com/assets/SaNDSLab-LogoForWhite-C43CoLgA.png"" alt=""SaNDS Lab"" style=""height: 36px;"" />
+                </div>
+                <h3>SaNDS Lab Middle East W.L.L</h3>
+                <p>✨ Enterprise AI & Smart Automation Systems</p>
+            </div>
+            <div class=""modal-body"">
+                <p style=""text-align: center; color: #cbd5e1; margin-bottom: 12px;"">
+                    Engineers turnkey software solutions for healthcare networks, commercial real-estate towers, and government bodies across Bahrain and the GCC.
+                </p>
+                <div class=""modal-info-box"">
+                    <div class=""info-item""><span>📍</span><strong>Regional HQ:</strong> <span>Manama, Kingdom of Bahrain</span></div>
+                    <div class=""info-item""><span>💬</span><strong>WhatsApp / Tel:</strong> <a href=""https://wa.me/97335078079"" target=""_blank"" style=""color: #34d399;"">+973 35078079</a></div>
+                    <div class=""info-item""><span>✉️</span><strong>Official Email:</strong> <a href=""mailto:info@sandslab.com"">info@sandslab.com</a></div>
+                    <div class=""info-item""><span>🌐</span><strong>Website:</strong> <a href=""https://www.sandslab.com"" target=""_blank"">https://sandslab.com &nearr;</a></div>
+                    <div class=""info-item""><span>🛍️</span><strong>Product Catalog:</strong> <a href=""https://sandslab.com/products/"" target=""_blank"" style=""color: #f472b6;"">https://sandslab.com/products/ &nearr;</a></div>
+                </div>
+                <div class=""modal-acts"">
+                    <a href=""https://wa.me/97335078079"" target=""_blank"" class=""btn-wa"">💬 Chat on WhatsApp</a>
+                    <a href=""https://sandslab.com/products/"" target=""_blank"" class=""btn-prod"">🛍️ Latest Products &nearr;</a>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -540,6 +619,17 @@ namespace AlRabeesh.SmartCard
                 btn.innerText = '💳 Read CPR Smart Card Now';
             }
         }
+
+        function openSandsModal() {
+            document.getElementById('sandsModal').classList.add('active');
+        }
+        function closeSandsModal(e) {
+            if (e && e.target !== e.currentTarget && !e.target.classList.contains('modal-close')) return;
+            document.getElementById('sandsModal').classList.remove('active');
+        }
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') document.getElementById('sandsModal').classList.remove('active');
+        });
     </script>
 </body>
 </html>";

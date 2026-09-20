@@ -57,19 +57,20 @@
       margin-bottom: 20px;
     }
     .sands-logo-header {
-      background: rgba(255, 255, 255, 0.12);
-      backdrop-filter: blur(12px);
-      padding: 8px 16px;
+      background: #ffffff;
+      padding: 6px 14px;
       border-radius: 12px;
-      border: 1px solid rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.4);
       display: inline-flex;
       align-items: center;
       cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
       transition: all 0.2s ease;
     }
     .sands-logo-header:hover {
-      background: rgba(255, 255, 255, 0.22);
+      background: #ffffff;
       transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
     }
     .sands-logo-header img {
       height: 38px;
@@ -632,7 +633,7 @@
 
     <div>
       <button type="button" class="btn-sands-footer" onclick="openSandsModal()">
-        <span>✨ Powered By</span>
+        <span>✨ Engineered By</span>
         <span class="gradient-text">SaNDS Lab</span>
       </button>
     </div>
@@ -647,7 +648,7 @@
 
     <!-- Gradient Header with SaNDS Lab Logo -->
     <div class="modal-header">
-      <div class="modal-logo-box">
+      <div class="modal-logo-box" style="background: #ffffff; padding: 6px 16px; border-radius: 14px; box-shadow: 0 4px 10px rgba(0,0,0,0.15);">
         <img
           src="https://qrgenerator.sandslab.com/assets/SaNDSLab-LogoForWhite-C43CoLgA.png"
           alt="SaNDS Lab Logo"
