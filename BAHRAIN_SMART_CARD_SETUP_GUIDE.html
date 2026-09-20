@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bahrain Smart Card Reader Setup Guide — Al Rabeesh Dental Center</title>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --primary-light: #eff6ff;
+      --emerald: #059669;
+      --emerald-bg: #ecfdf5;
+      --slate-900: #0f172a;
+      --slate-800: #1e293b;
+      --slate-700: #334155;
+      --slate-600: #475569;
+      --slate-500: #64748b;
+      --slate-100: #f1f5f9;
+      --slate-50: #f8fafc;
+      --border: #e2e8f0;
+      --amber: #d97706;
+      --amber-bg: #fffbeb;
+      --radius: 12px;
+      --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: #f8fafc;
+      color: var(--slate-800);
+      line-height: 1.6;
+      padding: 24px;
+    }
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      background: #ffffff;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .header {
+      background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+      color: #ffffff;
+      padding: 36px 32px;
+    }
+    .header-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255, 255, 255, 0.2);
+      backdrop-filter: blur(8px);
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    .header h1 {
+      font-size: 26px;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+    .header p {
+      font-size: 14px;
+      opacity: 0.9;
+      max-width: 700px;
+    }
+    .content {
+      padding: 32px;
+    }
+    .badge-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 28px;
+      padding: 16px;
+      background: var(--slate-50);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .pill-green { background: var(--emerald-bg); color: var(--emerald); border: 1px solid #a7f3d0; }
+    .pill-blue { background: var(--primary-light); color: var(--primary); border: 1px solid #bfdbfe; }
+    .pill-amber { background: var(--amber-bg); color: var(--amber); border: 1px solid #fde68a; }
+
+    .step-card {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05);
+      position: relative;
+    }
+    .step-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .step-number {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      background: var(--primary);
+      color: #ffffff;
+      font-weight: 800;
+      font-size: 15px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .step-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--slate-900);
+    }
+    .code-block {
+      background: var(--slate-900);
+      color: #f8fafc;
+      padding: 14px 16px;
+      border-radius: 8px;
+      font-family: Consolas, Monaco, "Courier New", monospace;
+      font-size: 13px;
+      overflow-x: auto;
+      margin: 12px 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .code-text {
+      color: #38bdf8;
+      word-break: break-all;
+    }
+    .btn-copy {
+      background: rgba(255, 255, 255, 0.15);
+      border: none;
+      color: white;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-copy:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+    .tip-box {
+      background: #f0fdf4;
+      border-left: 4px solid var(--emerald);
+      padding: 14px 16px;
+      border-radius: 0 8px 8px 0;
+      margin: 16px 0;
+      font-size: 13px;
+      color: #166534;
+    }
+    .warning-box {
+      background: #fffbeb;
+      border-left: 4px solid var(--amber);
+      padding: 14px 16px;
+      border-radius: 0 8px 8px 0;
+      margin: 16px 0;
+      font-size: 13px;
+      color: #92400e;
+    }
+    .table-container {
+      overflow-x: auto;
+      margin: 16px 0;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 13px;
+    }
+    th {
+      background: var(--slate-100);
+      color: var(--slate-700);
+      font-weight: 700;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      color: var(--slate-600);
+    }
+    tr:last-child td {
+      border-bottom: none;
+    }
+    tr:hover td {
+      background: var(--slate-50);
+    }
+    .footer {
+      text-align: center;
+      padding: 24px;
+      color: var(--slate-500);
+      font-size: 12px;
+      border-top: 1px solid var(--border);
+      background: var(--slate-50);
+    }
+    a.btn-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--primary);
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 13px;
+      transition: background 0.2s;
+    }
+    a.btn-action:hover {
+      background: var(--primary-dark);
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Header -->
+  <div class="header">
+    <div class="header-badge">🏥 Al Rabeesh Dental Center</div>
+    <h1>🇧🇭 Bahrain Smart Card Reader Setup Guide</h1>
+    <p>Complete deployment & 1-click installation manual for any computer (Reception Desk, Doctor Room, or Dental Branch PC).</p>
+  </div>
+
+  <div class="content">
+    <!-- Compatibility Bar -->
+    <div class="badge-bar">
+      <div class="pill pill-green">✓ Supports Old CPR Cards (Front Chip)</div>
+      <div class="pill pill-green">✓ Supports New 2025/2026 CPR Cards (Back Chip - V6)</div>
+      <div class="pill pill-blue">⚡ Local High-Speed Bridge (Port 5050)</div>
+      <div class="pill pill-amber">★ 1-Click Auto Setup</div>
+    </div>
+
+    <!-- Step 1 -->
+    <div class="step-card">
+      <div class="step-header">
+        <div class="step-number">1</div>
+        <div class="step-title">Plug in the USB Smart Card Reader</div>
+      </div>
+      <p style="font-size: 14px; color: var(--slate-600);">
+        Connect any standard USB Smart Card Reader (ACS ACR38/ACR39, Rocketek, Alcor Micro, Identiv, or generic EMV reader) into an available USB port.
+      </p>
+      <div class="tip-box">
+        <strong>✓ Automatic Driver:</strong> Windows 10 & 11 install standard CCID drivers automatically. No manual driver setup is required.
+      </div>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="step-card">
+      <div class="step-header">
+        <div class="step-number">2</div>
+        <div class="step-title">Extract Files to Your PC</div>
+      </div>
+      <p style="font-size: 14px; color: var(--slate-600);">
+        Extract this folder to your local drive (e.g. <code>C:\Al Rabeesh Software\</code> or <code>D:\Al Rabeesh Software\</code>).
+      </p>
+      <p style="font-size: 13px; color: var(--slate-500); margin-top: 8px;">
+        The folder contains the pre-configured <code>BahrainCardBridge\</code> application engine and the <code>Start_Bahrain_Card_Bridge.bat</code> launcher.
+      </p>
+    </div>
+
+    <!-- Step 3 -->
+    <div class="step-card">
+      <div class="step-header">
+        <div class="step-number">3</div>
+        <div class="step-title">1-Click Launch (Start_Bahrain_Card_Bridge.bat)</div>
+      </div>
+      <p style="font-size: 14px; color: var(--slate-600);">
+        Right-click <strong><code>Start_Bahrain_Card_Bridge.bat</code></strong> and select <strong>"Run as administrator"</strong> (or double click to run).
+      </p>
+      <div class="tip-box">
+        <strong>What the script automatically does:</strong>
+        <ul style="margin-left: 20px; margin-top: 6px;">
+          <li>Stops and disables any conflicting legacy Windows services.</li>
+          <li>Registers Windows URL ACL permissions for Port 5050.</li>
+          <li>Starts the <strong>Al Rabeesh Smart Card Bridge</strong> listening on <code>http://localhost:5050/</code>.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Step 4 -->
+    <div class="step-card">
+      <div class="step-header">
+        <div class="step-number">4</div>
+        <div class="step-title">Verify & Test Card Reading</div>
+      </div>
+      <p style="font-size: 14px; color: var(--slate-600); margin-bottom: 12px;">
+        Insert a Bahrain CPR card into the reader and test via the diagnostics page or the Al Rabeesh Dental Web App:
+      </p>
+
+      <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px;">
+        <a href="http://localhost:5050/" target="_blank" class="btn-action">🔍 Open Hardware Diagnostic (Port 5050)</a>
+        <a href="http://localhost:5050/status" target="_blank" class="btn-action" style="background: var(--slate-700);">● Service Health Check</a>
+      </div>
+
+      <div class="warning-box">
+        <strong>💳 Card Orientation Tip:</strong>
+        <ul style="margin-left: 20px; margin-top: 4px;">
+          <li><strong>Old CPR Cards (Chip on front):</strong> Insert with gold chip facing <strong>UP</strong>.</li>
+          <li><strong>New 2025/2026 Smart Cards (Chip on back):</strong> Insert with gold chip facing <strong>DOWN/TOWARDS CONTACTS</strong> so the reader detects the chip.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Step 5: Auto Start on Windows Boot -->
+    <div class="step-card">
+      <div class="step-header">
+        <div class="step-number">5</div>
+        <div class="step-title">Optional: Start Automatically on PC Boot</div>
+      </div>
+      <p style="font-size: 14px; color: var(--slate-600);">
+        To have the reader service start automatically whenever the receptionist or doctor turns on the PC:
+      </p>
+      <ol style="font-size: 13px; color: var(--slate-700); margin: 10px 0 10px 20px; line-height: 1.8;">
+        <li>Press <kbd style="background:#e2e8f0; padding:2px 6px; border-radius:4px;">Win + R</kbd>, type <code>shell:startup</code>, and press Enter.</li>
+        <li>Right-click inside the folder &rarr; <strong>New &rarr; Shortcut</strong>.</li>
+        <li>Select <code>Start_Bahrain_Card_Bridge.bat</code> as the target.</li>
+      </ol>
+    </div>
+
+    <!-- Troubleshooting Table -->
+    <div class="step-card">
+      <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 14px; color: var(--slate-900);">🛠️ Quick Troubleshooting</h3>
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Issue</th>
+              <th>Probable Cause</th>
+              <th>Solution</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>"No smart card reader detected"</strong></td>
+              <td>USB reader unplugged or Windows service stopped</td>
+              <td>Ensure USB reader is firmly plugged in. Check that Windows <code>Smart Card</code> service (<code>SCardSvr</code>) is running.</td>
+            </tr>
+            <tr>
+              <td><strong>"Card removed or cannot read"</strong></td>
+              <td>Card inserted upside down or backwards</td>
+              <td>Verify card chip orientation (Front chip = face up, Back chip = face down). Push card completely into the slot.</td>
+            </tr>
+            <tr>
+              <td><strong>"HTTP 503 / Port Conflict"</strong></td>
+              <td>Old service occupying port</td>
+              <td>Simply run <code>Start_Bahrain_Card_Bridge.bat</code> as Administrator to auto-clear conflicts.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    Al Rabeesh Dental Center &bull; Bahrain Smart Card Bridge 2026 &bull; Production Standalone Package
+  </div>
+</div>
+
+<script>
+  function copyCode(btn, text) {
+    navigator.clipboard.writeText(text).then(() => {
+      const orig = btn.innerText;
+      btn.innerText = 'Copied!';
+      setTimeout(() => btn.innerText = orig, 2000);
+    });
+  }
+</script>
+</body>
+</html>
