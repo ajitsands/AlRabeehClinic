@@ -521,14 +521,27 @@
     <div class="step-card">
       <div class="step-header">
         <div class="step-number">2</div>
-        <div class="step-title">Extract Files to Your PC</div>
+        <div class="step-title">Extract Files & Unblock Download (Important for New PCs)</div>
       </div>
       <p style="font-size: 14px; color: var(--slate-600);">
         Extract this package to your local drive (e.g. <code>C:\Al Rabeesh Software\</code> or <code>D:\Al Rabeesh Software\</code>).
       </p>
-      <p style="font-size: 13px; color: var(--slate-500); margin-top: 8px;">
-        The folder contains the pre-configured <code>BahrainCardBridge\</code> application engine and the <code>Start_Bahrain_Card_Bridge.bat</code> launcher.
-      </p>
+
+      <div class="warning-box" style="margin-top: 14px;">
+        <strong>🛡️ Windows Security Warning & "Mark of the Web" (Downloaded Files):</strong>
+        <p style="margin-top: 6px; font-size: 13px; line-height: 1.6;">
+          When downloading files through a browser, Windows tags them with an "Internet Zone" security flag, which can show <em>"Publisher could not be verified"</em> and restrict card reader background DLLs.
+        </p>
+        <ul style="margin-left: 20px; margin-top: 8px; line-height: 1.8;">
+          <li><strong>Recommended:</strong> Right-click <code>Bahrain_Smart_Card_Bridge_v2026.zip</code> (or <code>Start_Bahrain_Card_Bridge.bat</code>) &rarr; <strong>Properties</strong> &rarr; Check <strong>☑ Unblock</strong> at the bottom &rarr; Click <strong>Apply / OK</strong>.</li>
+          <li><strong>If Security Popup Appears:</strong> Uncheck <em>"Always ask before opening this file"</em> and click <strong>Run</strong>.</li>
+          <li><strong>Quick PowerShell Command (Unblocks all files at once):</strong>
+            <div style="background: #1e293b; color: #38bdf8; padding: 6px 12px; border-radius: 6px; font-family: monospace; font-size: 12px; margin-top: 4px;">
+              Unblock-File -Path "C:\Al Rabeesh Software\*" -Recurse
+            </div>
+          </li>
+        </ul>
+      </div>
     </div>
 
     <!-- Step 3 -->
@@ -603,6 +616,11 @@
             </tr>
           </thead>
           <tbody>
+            <tr>
+              <td><strong>"Publisher could not be verified" / Card not reading after download</strong></td>
+              <td>Windows "Mark of the Web" security restriction on downloaded files</td>
+              <td>Right-click the ZIP or BAT file &rarr; <strong>Properties</strong> &rarr; check <strong>☑ Unblock</strong> &rarr; <strong>OK</strong> (or run <code>Unblock-File</code> in PowerShell).</td>
+            </tr>
             <tr>
               <td><strong>"No smart card reader detected"</strong></td>
               <td>USB reader unplugged or Windows service stopped</td>
