@@ -11,6 +11,7 @@
       --primary-light: #eff6ff;
       --emerald: #059669;
       --emerald-bg: #ecfdf5;
+      --slate-950: #020617;
       --slate-900: #0f172a;
       --slate-800: #1e293b;
       --slate-700: #334155;
@@ -21,54 +22,85 @@
       --border: #e2e8f0;
       --amber: #d97706;
       --amber-bg: #fffbeb;
-      --radius: 12px;
-      --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+      --radius: 14px;
+      --shadow: 0 10px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      background-color: #f8fafc;
+      background-color: #f1f5f9;
       color: var(--slate-800);
       line-height: 1.6;
-      padding: 24px;
+      padding: 24px 16px;
     }
     .container {
-      max-width: 960px;
+      max-width: 980px;
       margin: 0 auto;
       background: #ffffff;
-      border-radius: 16px;
+      border-radius: 20px;
       border: 1px solid var(--border);
       box-shadow: var(--shadow);
       overflow: hidden;
     }
     .header {
-      background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+      background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #1e3a8a 100%);
       color: #ffffff;
       padding: 36px 32px;
+      position: relative;
+    }
+    .header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .sands-logo-header {
+      background: rgba(255, 255, 255, 0.12);
+      backdrop-filter: blur(12px);
+      padding: 8px 16px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      display: inline-flex;
+      align-items: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .sands-logo-header:hover {
+      background: rgba(255, 255, 255, 0.22);
+      transform: translateY(-1px);
+    }
+    .sands-logo-header img {
+      height: 38px;
+      object-fit: contain;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
     }
     .header-badge {
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      background: rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.18);
       backdrop-filter: blur(8px);
-      padding: 4px 12px;
+      padding: 6px 14px;
       border-radius: 9999px;
       font-size: 12px;
       font-weight: 700;
       letter-spacing: 0.5px;
       text-transform: uppercase;
-      margin-bottom: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.25);
     }
     .header h1 {
       font-size: 26px;
       font-weight: 800;
       margin-bottom: 8px;
+      letter-spacing: -0.5px;
     }
     .header p {
       font-size: 14px;
       opacity: 0.9;
-      max-width: 700px;
+      max-width: 720px;
+      line-height: 1.5;
     }
     .content {
       padding: 32px;
@@ -87,13 +119,14 @@
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      padding: 6px 12px;
+      padding: 6px 14px;
       border-radius: 8px;
-      font-size: 13px;
-      font-weight: 600;
+      font-size: 12px;
+      font-weight: 700;
     }
     .pill-green { background: var(--emerald-bg); color: var(--emerald); border: 1px solid #a7f3d0; }
     .pill-blue { background: var(--primary-light); color: var(--primary); border: 1px solid #bfdbfe; }
+    .pill-purple { background: #faf5ff; color: #7e22ce; border: 1px solid #e9d5ff; }
     .pill-amber { background: var(--amber-bg); color: var(--amber); border: 1px solid #fde68a; }
 
     .step-card {
@@ -101,15 +134,15 @@
       border: 1px solid var(--border);
       border-radius: var(--radius);
       padding: 24px;
-      margin-bottom: 24px;
-      box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05);
+      margin-bottom: 22px;
+      box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.04);
       position: relative;
     }
     .step-header {
       display: flex;
       align-items: center;
       gap: 12px;
-      margin-bottom: 16px;
+      margin-bottom: 14px;
     }
     .step-number {
       display: flex;
@@ -117,55 +150,25 @@
       justify-content: center;
       width: 32px;
       height: 32px;
-      background: var(--primary);
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
       color: #ffffff;
       font-weight: 800;
-      font-size: 15px;
+      font-size: 14px;
       border-radius: 50%;
       flex-shrink: 0;
+      box-shadow: 0 2px 4px rgba(37, 99, 235, 0.3);
     }
     .step-title {
-      font-size: 18px;
+      font-size: 17px;
       font-weight: 700;
       color: var(--slate-900);
-    }
-    .code-block {
-      background: var(--slate-900);
-      color: #f8fafc;
-      padding: 14px 16px;
-      border-radius: 8px;
-      font-family: Consolas, Monaco, "Courier New", monospace;
-      font-size: 13px;
-      overflow-x: auto;
-      margin: 12px 0;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .code-text {
-      color: #38bdf8;
-      word-break: break-all;
-    }
-    .btn-copy {
-      background: rgba(255, 255, 255, 0.15);
-      border: none;
-      color: white;
-      padding: 6px 12px;
-      border-radius: 6px;
-      font-size: 11px;
-      font-weight: bold;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-    .btn-copy:hover {
-      background: rgba(255, 255, 255, 0.3);
     }
     .tip-box {
       background: #f0fdf4;
       border-left: 4px solid var(--emerald);
       padding: 14px 16px;
       border-radius: 0 8px 8px 0;
-      margin: 16px 0;
+      margin: 14px 0;
       font-size: 13px;
       color: #166534;
     }
@@ -174,7 +177,7 @@
       border-left: 4px solid var(--amber);
       padding: 14px 16px;
       border-radius: 0 8px 8px 0;
-      margin: 16px 0;
+      margin: 14px 0;
       font-size: 13px;
       color: #92400e;
     }
@@ -208,14 +211,6 @@
     tr:hover td {
       background: var(--slate-50);
     }
-    .footer {
-      text-align: center;
-      padding: 24px;
-      color: var(--slate-500);
-      font-size: 12px;
-      border-top: 1px solid var(--border);
-      background: var(--slate-50);
-    }
     a.btn-action {
       display: inline-flex;
       align-items: center;
@@ -232,6 +227,247 @@
     a.btn-action:hover {
       background: var(--primary-dark);
     }
+
+    /* Footer matching application */
+    .app-footer {
+      padding: 16px 32px;
+      border-top: 1px solid var(--border);
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      sm-flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 13px;
+      color: var(--slate-500);
+    }
+    @media (min-width: 640px) {
+      .app-footer {
+        flex-direction: row;
+      }
+    }
+    .footer-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .btn-sands-footer {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      color: var(--slate-700);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    .btn-sands-footer:hover {
+      background: linear-gradient(135deg, #faf5ff 0%, #eef2ff 100%);
+      border-color: #c7d2fe;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 5px rgba(99, 102, 241, 0.15);
+    }
+    .gradient-text {
+      background: linear-gradient(135deg, #c026d3 0%, #7c3aed 50%, #4f46e5 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-weight: 800;
+    }
+
+    /* Sands Lab Modal Styles */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      background: rgba(2, 6, 23, 0.75);
+      backdrop-filter: blur(6px);
+      opacity: 0;
+      transition: opacity 0.2s ease-in-out;
+    }
+    .modal-overlay.active {
+      display: flex;
+      opacity: 1;
+    }
+    .modal-card {
+      position: relative;
+      width: 100%;
+      max-width: 500px;
+      background: #ffffff;
+      border-radius: 24px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+      border: 1px solid #e2e8f0;
+      overflow: hidden;
+      transform: scale(0.95);
+      transition: transform 0.2s ease-in-out;
+    }
+    .modal-overlay.active .modal-card {
+      transform: scale(1);
+    }
+    .modal-close {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      z-index: 20;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.2);
+      border: none;
+      color: #ffffff;
+      font-size: 16px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .modal-close:hover {
+      background: rgba(0, 0, 0, 0.4);
+    }
+    .modal-header {
+      padding: 28px 24px 22px;
+      background: linear-gradient(135deg, #c026d3 0%, #9333ea 50%, #4f46e5 100%);
+      color: #ffffff;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-logo-box {
+      background: rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(10px);
+      padding: 8px 18px;
+      border-radius: 16px;
+      margin-bottom: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .modal-logo-box img {
+      height: 48px;
+      object-fit: contain;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.25));
+    }
+    .modal-header h3 {
+      font-size: 20px;
+      font-weight: 800;
+      margin-bottom: 4px;
+    }
+    .modal-header p {
+      font-size: 12px;
+      font-weight: 600;
+      color: #f3e8ff;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .modal-body {
+      padding: 24px;
+    }
+    .modal-desc {
+      font-size: 13px;
+      color: var(--slate-600);
+      text-align: center;
+      line-height: 1.5;
+      margin-bottom: 18px;
+    }
+    .modal-details-box {
+      background: var(--slate-50);
+      border-radius: 16px;
+      padding: 16px;
+      border: 1px solid var(--border);
+      font-size: 13px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+    .detail-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .detail-row strong {
+      color: var(--slate-900);
+    }
+    .detail-row a {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .detail-row a:hover {
+      text-decoration: underline;
+    }
+    .modal-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .btn-modal-wa {
+      flex: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 10px 16px;
+      background: #10b981;
+      color: white;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 13px;
+      text-decoration: none;
+      box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.3);
+      transition: background 0.2s;
+    }
+    .btn-modal-wa:hover {
+      background: #059669;
+    }
+    .btn-modal-prod {
+      flex: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 10px 16px;
+      background: #ffffff;
+      color: #2563eb;
+      border: 2px solid #3b82f6;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 13px;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+    .btn-modal-prod:hover {
+      background: #eff6ff;
+    }
+    .btn-modal-close {
+      padding: 10px 18px;
+      background: var(--slate-100);
+      color: var(--slate-700);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-modal-close:hover {
+      background: var(--slate-200);
+    }
   </style>
 </head>
 <body>
@@ -239,7 +475,19 @@
 <div class="container">
   <!-- Header -->
   <div class="header">
-    <div class="header-badge">🏥 Al Rabeesh Dental Center</div>
+    <div class="header-top">
+      <!-- SaNDS Lab Top Logo Banner -->
+      <div class="sands-logo-header" onclick="openSandsModal()" title="Click to view SaNDS Lab profile">
+        <img
+          src="https://qrgenerator.sandslab.com/assets/SaNDSLab-LogoForWhite-C43CoLgA.png"
+          alt="SaNDS Lab"
+          onerror="this.style.display='none'"
+        />
+      </div>
+
+      <div class="header-badge">🏥 Al Rabeesh Dental Center</div>
+    </div>
+
     <h1>🇧🇭 Bahrain Smart Card Reader Setup Guide</h1>
     <p>Complete deployment & 1-click installation manual for any computer (Reception Desk, Doctor Room, or Dental Branch PC).</p>
   </div>
@@ -250,6 +498,7 @@
       <div class="pill pill-green">✓ Supports Old CPR Cards (Front Chip)</div>
       <div class="pill pill-green">✓ Supports New 2025/2026 CPR Cards (Back Chip - V6)</div>
       <div class="pill pill-blue">⚡ Local High-Speed Bridge (Port 5050)</div>
+      <div class="pill pill-purple">✨ Engineered by SaNDS Lab</div>
       <div class="pill pill-amber">★ 1-Click Auto Setup</div>
     </div>
 
@@ -274,7 +523,7 @@
         <div class="step-title">Extract Files to Your PC</div>
       </div>
       <p style="font-size: 14px; color: var(--slate-600);">
-        Extract this folder to your local drive (e.g. <code>C:\Al Rabeesh Software\</code> or <code>D:\Al Rabeesh Software\</code>).
+        Extract this package to your local drive (e.g. <code>C:\Al Rabeesh Software\</code> or <code>D:\Al Rabeesh Software\</code>).
       </p>
       <p style="font-size: 13px; color: var(--slate-500); margin-top: 8px;">
         The folder contains the pre-configured <code>BahrainCardBridge\</code> application engine and the <code>Start_Bahrain_Card_Bridge.bat</code> launcher.
@@ -375,19 +624,115 @@
 
   </div>
 
-  <div class="footer">
-    Al Rabeesh Dental Center &bull; Bahrain Smart Card Bridge 2026 &bull; Production Standalone Package
+  <!-- Application-Matching Footer -->
+  <footer class="app-footer">
+    <div class="footer-left">
+      <span>Al Rabeesh Dental Software • Bahrain Smart Card Active</span>
+    </div>
+
+    <div>
+      <button type="button" class="btn-sands-footer" onclick="openSandsModal()">
+        <span>✨ Powered By</span>
+        <span class="gradient-text">SaNDS Lab</span>
+      </button>
+    </div>
+  </footer>
+</div>
+
+<!-- SaNDS Lab Interactive Information Modal (Matching Application) -->
+<div id="sandsModal" class="modal-overlay" onclick="closeSandsModal(event)">
+  <div class="modal-card" onclick="event.stopPropagation()">
+    <!-- Close Button -->
+    <button class="modal-close" onclick="closeSandsModal()" title="Close Modal">&times;</button>
+
+    <!-- Gradient Header with SaNDS Lab Logo -->
+    <div class="modal-header">
+      <div class="modal-logo-box">
+        <img
+          src="https://qrgenerator.sandslab.com/assets/SaNDSLab-LogoForWhite-C43CoLgA.png"
+          alt="SaNDS Lab Logo"
+          onerror="this.style.display='none'"
+        />
+      </div>
+      <h3>SaNDS Lab Middle East W.L.L</h3>
+      <p>✨ Enterprise AI & Smart Automation Systems</p>
+    </div>
+
+    <!-- Modal Body -->
+    <div class="modal-body">
+      <p class="modal-desc">
+        Engineers turnkey software solutions for healthcare networks, commercial real-estate towers, and government bodies across Bahrain and the GCC.
+      </p>
+
+      <div class="modal-details-box">
+        <div class="detail-row">
+          <span>📍</span>
+          <strong>Regional HQ:</strong>
+          <span>Manama, Kingdom of Bahrain</span>
+        </div>
+        <div class="detail-row">
+          <span>💬</span>
+          <strong>WhatsApp / Tel:</strong>
+          <a href="https://wa.me/97335078079" target="_blank" style="color: #059669; font-weight: 700;">+973 35078079</a>
+        </div>
+        <div class="detail-row">
+          <span>✉️</span>
+          <strong>Official Email:</strong>
+          <a href="mailto:info@sandslab.com">info@sandslab.com</a>
+        </div>
+        <div class="detail-row">
+          <span>🌐</span>
+          <strong>Website:</strong>
+          <a href="https://www.sandslab.com" target="_blank">https://sandslab.com ↗</a>
+        </div>
+        <div class="detail-row">
+          <span>🛍️</span>
+          <strong>Product Catalog:</strong>
+          <a href="https://sandslab.com/products/" target="_blank" style="color: #db2777;">https://sandslab.com/products/ ↗</a>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="modal-actions">
+        <a href="https://wa.me/97335078079" target="_blank" class="btn-modal-wa">
+          <span>💬 Chat on WhatsApp</span>
+        </a>
+        <a href="https://sandslab.com/products/" target="_blank" class="btn-modal-prod">
+          <span>🛍️ Latest Products ↗</span>
+        </a>
+        <button type="button" class="btn-modal-close" onclick="closeSandsModal()">
+          Close
+        </button>
+      </div>
+    </div>
   </div>
 </div>
 
 <script>
-  function copyCode(btn, text) {
-    navigator.clipboard.writeText(text).then(() => {
-      const orig = btn.innerText;
-      btn.innerText = 'Copied!';
-      setTimeout(() => btn.innerText = orig, 2000);
-    });
+  function openSandsModal() {
+    const modal = document.getElementById('sandsModal');
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
   }
+
+  function closeSandsModal(e) {
+    if (e && e.target !== e.currentTarget && !e.target.classList.contains('modal-close') && !e.target.classList.contains('btn-modal-close')) {
+      return;
+    }
+    const modal = document.getElementById('sandsModal');
+    modal.classList.remove('active');
+    document.body.style.overflow = '';
+  }
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      const modal = document.getElementById('sandsModal');
+      if (modal.classList.contains('active')) {
+        closeSandsModal();
+      }
+    }
+  });
 </script>
+
 </body>
 </html>
